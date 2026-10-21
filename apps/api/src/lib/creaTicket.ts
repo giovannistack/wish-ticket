@@ -95,7 +95,7 @@ export async function creaTicket(
     await app.mailer.invia({
       a: app.cfg.emailAvvisiAdmin,
       oggetto: `${bloccante ? '[BLOCCANTE] ' : ''}${ticket.numero} · ${azienda?.nome}: ${dati.oggetto}`,
-      titolo: `Nuovo ticket ${ticket.numero}`,
+      titolo: `Nuovo ticket ${ticket.numero} · ${azienda?.nome}`,
       paragrafi: [
         `${richiedente?.nome} ${richiedente?.cognome} (${azienda?.nome}) ha aperto un ticket con priorità ${PRIORITA_LABEL[dati.priorita].nome.toLowerCase()}.`,
         dati.oggetto,
@@ -107,9 +107,13 @@ export async function creaTicket(
   if (richiedente && richiedente.ruolo !== 'admin') {
     await app.mailer.invia({
       a: richiedente.email,
-      oggetto: `Ticket ${ticket.numero} ${o.daWish ? 'aperto' : 'ricevuto'} · Wish Assistenza`,
+      oggetto: `Ticket ${ticket.numero} ${o.daWish ? 'aperto' : 'ricevuto'} · ${azienda?.nome} · Wish Assistenza`,
       titolo: o.daWish ? `Wish ha aperto per te il ticket ${ticket.numero}` : `Abbiamo ricevuto il ticket ${ticket.numero}`,
-      paragrafi: [`"${dati.oggetto}"`, 'Il team Wish lo segue e ti avviserà a ogni aggiornamento.'],
+      paragrafi: [
+        `Azienda: ${azienda?.nome} · Richiedente: ${richiedente.nome} ${richiedente.cognome}`,
+        `"${dati.oggetto}"`,
+        'Il team Wish lo segue e ti avviserà a ogni aggiornamento.',
+      ],
       bottone: { testo: 'Vedi il ticket', url: `${app.cfg.urlPubblico}/ticket/${ticket._id}` },
     });
   }

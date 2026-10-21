@@ -96,9 +96,13 @@ const routes: FastifyPluginAsync = async (app) => {
       if (u && u.ruolo !== 'admin' && u.stato === 'attivo') {
         await app.mailer.invia({
           a: u.email,
-          oggetto: `${t.numero}: nuovo documento da Wish`,
+          oggetto: `${t.numero} · ${nomeAzienda(t)}: nuovo documento da Wish`,
           titolo: `Nuovo documento sul ticket ${t.numero}`,
-          paragrafi: [`Il team Wish ha aggiunto "${a.nomeOriginale}".`, ...(a.nota ? [a.nota] : [])],
+          paragrafi: [
+            `Azienda: ${nomeAzienda(t)} · Ticket: ${t.oggetto}`,
+            `Il team Wish ha aggiunto "${a.nomeOriginale}".`,
+            ...(a.nota ? [a.nota] : []),
+          ],
           bottone: { testo: 'Vedi il ticket', url: `${app.cfg.urlPubblico}/ticket/${t._id}` },
         });
       }
@@ -228,7 +232,7 @@ const routes: FastifyPluginAsync = async (app) => {
     const t = await popolaTicket(TicketModel.findById(id)).lean();
     if (!t) return;
     const autore = await UtenteModel.findById(autoreId, { nome: 1, cognome: 1 }).lean();
-    const azienda = (t.aziendaId as { nome?: string } | null)?.nome ?? '';
+    const azienda = nomeAzienda(t);
     const richiedente = (t.richiedenteId as { nome?: string; cognome?: string } | null) ?? null;
     await app.mailer.invia({
       a: tecnico.email,
@@ -268,12 +272,15 @@ const routes: FastifyPluginAsync = async (app) => {
     if (!paragrafi) return;
     await app.mailer.invia({
       a: richiedente.email,
-      oggetto: `${t.numero}: ${STATO_TICKET_LABEL[t.stato as StatoTicket].toLowerCase()} · Wish Assistenza`,
+      oggetto: `${t.numero} · ${nomeAzienda(t)}: ${STATO_TICKET_LABEL[t.stato as StatoTicket].toLowerCase()} · Wish Assistenza`,
       titolo: `${t.numero} · ${t.oggetto}`,
-      paragrafi,
+      paragrafi: [`Azienda: ${nomeAzienda(t)}`, ...paragrafi],
       bottone: { testo: 'Vedi il ticket', url: `${app.cfg.urlPubblico}/ticket/${t._id}` },
     });
   }
 };
+
+/** Nome dell'azienda di un ticket popolato. */
+const nomeAzienda = (t: { aziendaId?: unknown }) => (t.aziendaId as { nome?: string } | null)?.nome ?? '';
 
 export default routes;

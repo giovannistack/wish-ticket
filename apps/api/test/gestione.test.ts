@@ -36,6 +36,18 @@ describe('gestione ticket', () => {
     expect(r.json().tecnico.id).toBe(adminId);
     const mail = ctx.app.mailer.posta.slice(prima).find((m) => m.a === 'cliente@modo.it');
     expect(mail?.oggetto).toMatch(/in carico/);
+    expect(mail?.oggetto).toContain(ctx.aziende.modo.nome);
+    expect(mail?.paragrafi[0]).toBe(`Azienda: ${ctx.aziende.modo.nome}`);
+  });
+
+  it("l'azienda compare nelle email di apertura, al cliente e a Wish", async () => {
+    const prima = ctx.app.mailer.posta.length;
+    await ctx.app.inject({ method: 'POST', url: '/api/ticket', headers: bearer(collega.token), payload: ticketDiProva('Monitor spento') });
+    const nuove = ctx.app.mailer.posta.slice(prima);
+    expect(nuove.length).toBeGreaterThanOrEqual(2);
+    for (const m of nuove) expect(m.oggetto).toContain(ctx.aziende.modo.nome);
+    const alCliente = nuove.find((m) => m.a === 'collega@modo.it');
+    expect(alCliente?.paragrafi[0]).toContain(`Azienda: ${ctx.aziende.modo.nome}`);
   });
 
   it('salva modalità, tempo e priorità e li registra nello storico', async () => {
