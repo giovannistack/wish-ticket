@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STATI_TICKET, STATO_TICKET_LABEL, type AziendaConStatsDTO, type StatoTicket, type TicketDTO } from '@wish/shared';
 import { api } from '../../api';
 import { Avviso, Caricamento, Icona, PrioritaPill, StatoPill, Vuoto, dataBreve } from '../../components/ui';
@@ -20,6 +20,11 @@ export default function Dashboard() {
   const [cerca, setCerca] = useState('');
   const [soloMiei, setSoloMiei] = useState(false);
   const { utente } = useAuth();
+  const qc = useQueryClient();
+  const elimina = useMutation({
+    mutationFn: (id: string) => api(`/admin/ticket/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
+  });
 
   const aziende = useQuery({ queryKey: ['admin', 'aziende'], queryFn: () => api<AziendaConStatsDTO[]>('/admin/aziende') });
   const tutti = useQuery({
@@ -151,7 +156,8 @@ export default function Dashboard() {
                   <th className="px-3 py-3 font-semibold">Priorità</th>
                   <th className="px-3 py-3 font-semibold">Stato</th>
                   <th className="px-3 py-3 font-semibold">Tecnico</th>
-                  <th className="px-5 py-3 text-right font-semibold">Aperto</th>
+                  <th className="px-3 py-3 text-right font-semibold">Aperto</th>
+                  <th className="w-14 px-3 py-3"><span className="sr-only">Azioni</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -174,7 +180,22 @@ export default function Dashboard() {
                     <td className="px-3 py-3.5 align-top"><PrioritaPill priorita={t.priorita} /></td>
                     <td className="px-3 py-3.5 align-top"><StatoPill stato={t.stato} /></td>
                     <td className="px-3 py-3.5 align-top text-testo">{t.tecnico?.nome ?? <span className="text-muto">—</span>}</td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right align-top text-muto">{dataBreve(t.createdAt)}</td>
+                    <td className="whitespace-nowrap px-3 py-3.5 text-right align-top text-muto">{dataBreve(t.createdAt)}</td>
+                    <td className="px-3 py-2 text-right align-top">
+                      <button
+                        type="button"
+                        aria-label={`Elimina ${t.numero}`}
+                        title="Elimina ticket"
+                        disabled={elimina.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Eliminare definitivamente il ticket ${t.numero} (${t.azienda.nome})?`)) elimina.mutate(t.id);
+                        }}
+                        className="flex size-10 items-center justify-center rounded-lg text-muto hover:bg-[#fff5f5] hover:text-[#a31b1b]"
+                      >
+                        <Icona nome="cestino" dimensione={17} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

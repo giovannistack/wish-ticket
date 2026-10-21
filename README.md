@@ -20,7 +20,9 @@ Web app di ticketing per l'assistenza tecnica Wish. Tre aziende clienti (MODO SP
 - Note interne, mai visibili ai clienti. Storico completo di ogni modifica per l'admin; il cliente vede solo apertura, assegnazione e cambi di stato.
 - Dashboard: colonna tecnico e filtro "Assegnati a me".
 - Utenti e accessi: riquadro "Rifiutati e disattivati" con "Rimetti in attesa" ed "Elimina" (solo per chi non ha aperto ticket).
-- I tecnici sono gli account admin attivi. Per aggiungerne uno: `ADMIN_EMAIL=… ADMIN_PASSWORD=… npm run seed`.
+- Pagina **Team Wish**: crei a mano gli altri admin/tecnici (nome, email, password), cambi la password, li disattivi o elimini. La password non viene mai mandata per email.
+- Quando assegni un ticket a un collega, lui riceve una email con i dettagli, in copia a `EMAIL_AVVISI_ADMIN` (es. assistenza@wishsrl.it).
+- Eliminazione dei ticket (dalla dashboard o dal dettaglio) e degli utenti, anche attivi: i ticket di un utente eliminato restano, con il richiedente "Utente eliminato".
 
 **Prossime fasi**: messaggi e allegati nei ticket (2), notifiche push/SSE e comunicazioni (4), report, apparati e collegamento con il calendario interventi (5).
 

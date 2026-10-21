@@ -167,6 +167,22 @@ export type AggiornaTicketInput = z.input<typeof aggiornaTicketSchema>;
 
 export const notaSchema = z.object({ testo: testo(1, 5000, 'Nota') });
 
+export const nuovoTecnicoSchema = z.object({
+  nome: testo(2, 60, 'Nome'),
+  cognome: testo(2, 60, 'Cognome'),
+  email: z.email('Email non valida').trim().toLowerCase().max(160),
+  password: passwordSchema,
+});
+export type NuovoTecnicoInput = z.input<typeof nuovoTecnicoSchema>;
+
+export const aggiornaTecnicoSchema = z
+  .object({
+    nome: testo(2, 60, 'Nome').optional(),
+    cognome: testo(2, 60, 'Cognome').optional(),
+    password: passwordSchema.optional(),
+  })
+  .refine((d) => Object.keys(d).length > 0, { message: 'Nessuna modifica' });
+
 // ---------- Tipi delle risposte API ----------
 
 export interface UtenteDTO {
@@ -246,6 +262,18 @@ export interface TicketAdminDTO extends TicketDTO {
 export interface TecnicoDTO {
   id: string;
   nome: string;
+}
+
+/** Account del team Wish (admin/tecnici) per la pagina Team. */
+export interface MembroTeamDTO {
+  id: string;
+  nome: string;
+  cognome: string;
+  email: string;
+  stato: StatoUtente;
+  ultimoAccesso: string | null;
+  ticketAperti: number;
+  io: boolean;
 }
 
 export interface LoginResponse {

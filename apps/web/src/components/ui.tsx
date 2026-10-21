@@ -177,6 +177,19 @@ const PERCORSI: Record<string, ReactNode> = {
       <path d="M21 21l-4.3-4.3" />
     </>
   ),
+  cestino: (
+    <>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    </>
+  ),
+  team: (
+    <>
+      <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z" />
+      <path d="M9 12l2 2 4-4" />
+    </>
+  ),
   posta: (
     <>
       <rect x="3" y="5" width="18" height="14" rx="2" />

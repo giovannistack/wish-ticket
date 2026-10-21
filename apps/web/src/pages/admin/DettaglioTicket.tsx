@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MODALITA,
@@ -68,6 +68,15 @@ export default function DettaglioTicketAdmin() {
   const [bozza, setBozza] = useState<Bozza | null>(null);
   const [nota, setNota] = useState('');
   const [salvato, setSalvato] = useState(false);
+  const navigate = useNavigate();
+  const elimina = useMutation({
+    mutationFn: () => api(`/admin/ticket/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: chiave });
+      qc.invalidateQueries({ queryKey: ['admin'] });
+      navigate('/admin', { replace: true });
+    },
+  });
 
   // Il modulo si riempie al primo caricamento e dopo ogni salvataggio:
   // aggiungere una nota o un aggiornamento in background non cancella le modifiche in corso.
@@ -272,6 +281,18 @@ export default function DettaglioTicketAdmin() {
             <p className="text-xs leading-relaxed text-muto">
               Il cliente riceve una email quando cambia lo stato. Per segnare risolto serve la soluzione.
             </p>
+          </div>
+          <div className="border-t border-riga pt-4">
+            <button
+              type="button"
+              className="btn-pericolo w-full"
+              disabled={elimina.isPending}
+              onClick={() => {
+                if (window.confirm(`Eliminare definitivamente il ticket ${t.numero}?\nSpariscono anche note e storico, e il cliente non lo vedrà più.`)) elimina.mutate();
+              }}
+            >
+              <Icona nome="cestino" dimensione={16} /> Elimina ticket
+            </button>
           </div>
         </form>
       </div>

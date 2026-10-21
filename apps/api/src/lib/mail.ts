@@ -4,6 +4,8 @@ import type { Config } from '../config.js';
 
 export interface Email {
   a: string;
+  /** Copia conoscenza (es. la casella assistenza). */
+  cc?: string;
   oggetto: string;
   titolo: string;
   paragrafi: string[];
@@ -57,11 +59,12 @@ export function creaMailer(cfg: Config, log: FastifyBaseLogger): Mailer {
         .join('\n');
       if (!transport) {
         posta.push({ ...email, html });
-        log.info({ a: email.a, oggetto: email.oggetto, link: email.bottone?.url }, 'Email (SMTP non configurato)');
+        log.info({ a: email.a, cc: email.cc, oggetto: email.oggetto, link: email.bottone?.url }, 'Email (SMTP non configurato)');
         return;
       }
       try {
-        await transport.sendMail({ from: cfg.mittente, to: email.a, subject: email.oggetto, html, text: testo });
+        const cc = email.cc && email.cc.toLowerCase() !== email.a.toLowerCase() ? email.cc : undefined;
+        await transport.sendMail({ from: cfg.mittente, to: email.a, cc, subject: email.oggetto, html, text: testo });
       } catch (err) {
         // L'invio fallito non deve bloccare l'operazione: si registra e si va avanti.
         log.error({ err, a: email.a, oggetto: email.oggetto }, 'Invio email fallito');

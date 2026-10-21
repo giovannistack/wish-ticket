@@ -146,11 +146,13 @@ describe('rifiutati e disattivati', () => {
     expect(nuovo?.stato).toBe('in_attesa');
   });
 
-  it('non elimina chi ha aperto ticket né gli utenti attivi', async () => {
-    const attivo = await ctx.app.inject({ method: 'DELETE', url: `/api/admin/utenti/${cliente.id}`, headers: bearer(admin) });
-    expect(attivo.statusCode).toBe(409);
-    await ctx.app.inject({ method: 'POST', url: `/api/admin/utenti/${cliente.id}/disattiva`, headers: bearer(admin) });
-    const conTicket = await ctx.app.inject({ method: 'DELETE', url: `/api/admin/utenti/${cliente.id}`, headers: bearer(admin) });
-    expect(conTicket.json().codice).toBe('HA_TICKET');
+  it('elimina anche un utente attivo con ticket: i ticket restano come "Utente eliminato"', async () => {
+    const del = await ctx.app.inject({ method: 'DELETE', url: `/api/admin/utenti/${cliente.id}`, headers: bearer(admin) });
+    expect(del.statusCode).toBe(200);
+    expect(del.json().ticketConservati).toBe(1);
+    const t = await ctx.app.inject({ method: 'GET', url: `/api/admin/ticket/${ticketId}`, headers: bearer(admin) });
+    expect(t.json().richiedente.nome).toBe('Utente eliminato');
+    const me = await ctx.app.inject({ method: 'GET', url: '/api/me', headers: bearer(cliente.token) });
+    expect(me.statusCode).toBe(401);
   });
 });

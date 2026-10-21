@@ -6,9 +6,11 @@ import {
   notaSchema,
   objectIdSchema,
   PRIORITA,
+  PRIORITA_LABEL,
   STATI_APERTI,
   STATI_TICKET,
   STATO_TICKET_LABEL,
+  type Priorita,
   type StatoTicket,
 } from '@wish/shared';
 import { NotaModel, StoricoModel, TicketModel, UtenteModel } from '../../models/index.js';
@@ -63,6 +65,7 @@ const routes: FastifyPluginAsync = async (app) => {
     if (!t) throw nonTrovato('Ticket');
 
     const eventi: Array<{ azione: string; testo: string }> = [];
+    let nuovoTecnico: { email: string; nome: string } | null = null;
     const statoPrima = t.stato as StatoTicket;
 
     // Prendere in carico un ticket senza tecnico lo assegna a chi lo fa
@@ -71,9 +74,10 @@ const routes: FastifyPluginAsync = async (app) => {
     if (dati.tecnicoId !== undefined && String(dati.tecnicoId) !== String(t.tecnicoId ?? null)) {
       let nome: string | null = null;
       if (dati.tecnicoId) {
-        const tec = await UtenteModel.findOne({ _id: dati.tecnicoId, ruolo: 'admin', stato: 'attivo' }, { nome: 1, cognome: 1 }).lean();
+        const tec = await UtenteModel.findOne({ _id: dati.tecnicoId, ruolo: 'admin', stato: 'attivo' }, { nome: 1, cognome: 1, email: 1 }).lean();
         if (!tec) throw new ErroreApi(400, 'Tecnico non valido', 'TECNICO_NON_VALIDO');
         nome = `${tec.nome} ${tec.cognome}`;
+        if (String(tec._id) !== req.utente.id) nuovoTecnico = { email: tec.email, nome: tec.nome };
       }
       t.tecnicoId = dati.tecnicoId ? new Types.ObjectId(dati.tecnicoId) : null;
       eventi.push({ azione: 'assegnato', testo: testoEvento.assegnato(nome) });
@@ -109,8 +113,25 @@ const routes: FastifyPluginAsync = async (app) => {
         eventi.map((e) => ({ ticketId: t._id, aziendaId: t.aziendaId, autoreId: req.utente.id, azione: e.azione, dettagli: { testo: e.testo } })),
       );
       if (t.stato !== statoPrima) await avvisaCliente(t._id, statoPrima);
+      if (nuovoTecnico) await avvisaTecnico(t._id, nuovoTecnico, req.utente.id);
     }
     return ticketAdmin(t._id);
+  });
+
+  /** Elimina definitivamente un ticket con note e storico. Resta una riga nel registro generale. */
+  app.delete<{ Params: { id: string } }>('/:id', async (req) => {
+    if (!Types.ObjectId.isValid(req.params.id)) throw nonTrovato('Ticket');
+    const t = await TicketModel.findById(req.params.id, { numero: 1, oggetto: 1, aziendaId: 1 }).lean();
+    if (!t) throw nonTrovato('Ticket');
+    await Promise.all([NotaModel.deleteMany({ ticketId: t._id }), StoricoModel.deleteMany({ ticketId: t._id })]);
+    await TicketModel.deleteOne({ _id: t._id });
+    await StoricoModel.create({
+      aziendaId: t.aziendaId,
+      autoreId: req.utente.id,
+      azione: 'ticket_eliminato',
+      dettagli: { numero: t.numero, oggetto: t.oggetto },
+    });
+    return { ok: true };
   });
 
   app.post<{ Params: { id: string } }>('/:id/note', async (req, reply) => {
@@ -122,6 +143,28 @@ const routes: FastifyPluginAsync = async (app) => {
     await StoricoModel.create({ ticketId: t._id, aziendaId: t.aziendaId, autoreId: req.utente.id, azione: 'nota', dettagli: { testo: testoEvento.nota() } });
     return reply.status(201).send(await ticketAdmin(t._id));
   });
+
+  /** Email al tecnico a cui è stato assegnato il ticket, in copia alla casella assistenza. */
+  async function avvisaTecnico(id: Types.ObjectId, tecnico: { email: string; nome: string }, autoreId: string) {
+    const t = await popolaTicket(TicketModel.findById(id)).lean();
+    if (!t) return;
+    const autore = await UtenteModel.findById(autoreId, { nome: 1, cognome: 1 }).lean();
+    const azienda = (t.aziendaId as { nome?: string } | null)?.nome ?? '';
+    const richiedente = (t.richiedenteId as { nome?: string; cognome?: string } | null) ?? null;
+    await app.mailer.invia({
+      a: tecnico.email,
+      cc: app.cfg.emailAvvisiAdmin,
+      oggetto: `${t.priorita === 'bloccante' ? '[BLOCCANTE] ' : ''}Ti è stato assegnato ${t.numero} · ${azienda}`,
+      titolo: `${t.numero} · ${t.oggetto}`,
+      paragrafi: [
+        `Ciao ${tecnico.nome}, ${autore ? `${autore.nome} ${autore.cognome}` : 'il team'} ti ha assegnato questo ticket.`,
+        `Azienda: ${azienda}${richiedente ? ` · Richiedente: ${richiedente.nome ?? ''} ${richiedente.cognome ?? ''}` : ''}${t.telefono ? ` · Tel. ${t.telefono}` : ''}`,
+        `Priorità: ${PRIORITA_LABEL[t.priorita as Priorita].nome}`,
+        t.descrizione,
+      ],
+      bottone: { testo: 'Apri il ticket', url: `${app.cfg.urlPubblico}/admin/ticket/${t._id}` },
+    });
+  }
 
   /** Email al richiedente quando il ticket cambia stato. */
   async function avvisaCliente(id: Types.ObjectId, statoPrima: StatoTicket) {

@@ -50,6 +50,9 @@ export default function LayoutAdmin() {
           <VoceMenu to="/admin/utenti" icona="utenti" badge={inAttesa.data?.length}>
             Utenti e accessi
           </VoceMenu>
+          <VoceMenu to="/admin/team" icona="team">
+            Team Wish
+          </VoceMenu>
         </div>
         <div className="mt-auto flex items-center gap-3 border-t border-navy-2 px-2 pt-4">
           <span className="flex size-10 items-center justify-center rounded-full bg-navy-2 text-sm font-bold" aria-hidden="true">

@@ -89,7 +89,7 @@ function NonAttivi() {
     <section className="card overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-riga px-5 py-4">
         <h2 className="text-base font-extrabold">Rifiutati e disattivati</h2>
-        <span className="text-xs text-muto">Questi indirizzi non possono accedere né registrarsi di nuovo</span>
+        <span className="text-xs text-muto">Non possono accedere né registrarsi di nuovo, finché non li rimetti in attesa o li elimini</span>
       </div>
       {errore && <div className="px-5 pt-4"><Avviso>{errore.message}</Avviso></div>}
       {elenco.map((u) => (
@@ -112,7 +112,7 @@ function NonAttivi() {
               className="btn-pericolo min-h-9 px-3 text-[13px]"
               disabled={elimina.isPending}
               onClick={() => {
-                if (window.confirm(`Eliminare ${u.email}? Potrà registrarsi di nuovo da zero.`)) elimina.mutate(u.id);
+                if (window.confirm(`Eliminare ${u.email}? Potrà registrarsi di nuovo da zero. Gli eventuali ticket restano, come "Utente eliminato".`)) elimina.mutate(u.id);
               }}
             >
               Elimina
@@ -132,6 +132,10 @@ export default function Utenti() {
   const attivi = useQuery({ queryKey: ['admin', 'utenti', 'attivo'], queryFn: () => api<UtenteDTO[]>('/admin/utenti?stato=attivo') });
   const disattiva = useMutation({
     mutationFn: (id: string) => api(`/admin/utenti/${id}/disattiva`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
+  });
+  const eliminaUtente = useMutation({
+    mutationFn: (id: string) => api(`/admin/utenti/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
   });
 
@@ -196,7 +200,7 @@ export default function Utenti() {
             ))}
           </div>
         </div>
-        {disattiva.error && <div className="px-5 pt-4"><Avviso>{(disattiva.error as Error).message}</Avviso></div>}
+        {(disattiva.error ?? eliminaUtente.error) && <div className="px-5 pt-4"><Avviso>{((disattiva.error ?? eliminaUtente.error) as Error).message}</Avviso></div>}
         {attivi.isLoading ? (
           <Caricamento />
         ) : (
@@ -235,6 +239,16 @@ export default function Utenti() {
                         }}
                       >
                         Disattiva
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-pericolo ml-2 min-h-9 px-3 text-[13px]"
+                        disabled={eliminaUtente.isPending}
+                        onClick={() => {
+                          if (window.confirm(`Eliminare ${u.nome} ${u.cognome}?\nPerde subito l'accesso. I ticket che ha aperto restano, come "Utente eliminato".`)) eliminaUtente.mutate(u.id);
+                        }}
+                      >
+                        Elimina
                       </button>
                     </td>
                   </tr>

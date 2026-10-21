@@ -20,6 +20,7 @@ const LayoutAdmin = lazy(() => import('./components/LayoutAdmin'));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
 const DettaglioTicketAdmin = lazy(() => import('./pages/admin/DettaglioTicket'));
 const Utenti = lazy(() => import('./pages/admin/Utenti'));
+const Team = lazy(() => import('./pages/admin/Team'));
 
 function Protetta({ ruolo, children }: { ruolo: 'cliente' | 'admin'; children: ReactNode }) {
   const { utente, pronto } = useAuth();
@@ -61,6 +62,7 @@ const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       { path: 'ticket/:id', element: <DettaglioTicketAdmin /> },
       { path: 'utenti', element: <Utenti /> },
+      { path: 'team', element: <Team /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

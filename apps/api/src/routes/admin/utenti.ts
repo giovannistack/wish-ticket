@@ -109,17 +109,22 @@ const routes: FastifyPluginAsync = async (app) => {
     return dto(u._id);
   });
 
-  /** Elimina un indirizzo non attivo, che così può registrarsi di nuovo. Chi ha ticket si disattiva, non si elimina. */
+  /**
+   * Elimina un utente cliente (anche attivo). L'indirizzo potrà registrarsi di nuovo.
+   * I ticket che ha aperto restano, con il richiedente indicato come "Utente eliminato".
+   */
   app.delete<{ Params: { id: string } }>('/:id', async (req) => {
     const u = await trova(req.params.id);
-    if (u.stato === 'attivo') throw new ErroreApi(409, 'Disattiva l\'utente prima di eliminarlo', 'STATO');
-    if (await TicketModel.exists({ richiedenteId: u._id })) {
-      throw new ErroreApi(409, 'L\'utente ha aperto dei ticket: lascialo disattivato per conservarne lo storico', 'HA_TICKET');
-    }
+    const ticketAperti = await TicketModel.countDocuments({ richiedenteId: u._id });
     await RefreshTokenModel.deleteMany({ utenteId: u._id });
     await UtenteModel.deleteOne({ _id: u._id });
-    await StoricoModel.create({ autoreId: req.utente.id, azione: 'utente_eliminato', dettagli: { email: u.email } });
-    return { ok: true };
+    await StoricoModel.create({
+      aziendaId: u.aziendaId,
+      autoreId: req.utente.id,
+      azione: 'utente_eliminato',
+      dettagli: { email: u.email, nome: `${u.nome} ${u.cognome}`, ticketConservati: ticketAperti },
+    });
+    return { ok: true, ticketConservati: ticketAperti };
   });
 
   app.post<{ Params: { id: string } }>('/:id/disattiva', async (req) => {
