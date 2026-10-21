@@ -1,0 +1,29 @@
+{
+  "name": "wish-ticket",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build:shared": "npm run build -w @wish/shared",
+    "dev:api": "npm run build:shared && npm run dev -w @wish/api",
+    "dev:web": "npm run dev -w @wish/web",
+    "build": "npm run build -w @wish/shared && npm run build -w @wish/web && npm run build -w @wish/api",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "test": "npm run build:shared && npm run test -w @wish/api",
+    "seed": "node --env-file-if-exists=.env apps/api/dist/seed.js",
+    "start": "node --env-file-if-exists=.env apps/api/dist/server.js",
+    "seed:dev": "npm run seed -w @wish/api"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

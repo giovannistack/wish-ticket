@@ -1,0 +1,12 @@
+# Caddy: HTTPS automatico (Let's Encrypt) davanti a Node.
+# Il dominio deve puntare all'IP del server e le porte 80 e 443 devono essere aperte.
+ticket.wishsrl.it {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8040
+	log {
+		output file C:\wish-ticket\logs\caddy.log {
+			roll_size 10mb
+			roll_keep 10
+		}
+	}
+}
