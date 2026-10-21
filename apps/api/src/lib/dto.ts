@@ -59,6 +59,10 @@ export function ticketDTO(t: any): TicketDTO {
     stato: t.stato,
     disponibilita: t.disponibilita,
     telefono: t.telefono ?? '',
+    tecnico: riferimento(t.tecnicoId, nomePersona),
+    modalita: t.modalita ?? null,
+    soluzione: t.soluzione ?? '',
+    chiusoIl: t.chiusoIl ? new Date(t.chiusoIl).toISOString() : null,
     createdAt: new Date(t.createdAt).toISOString(),
     updatedAt: new Date(t.updatedAt).toISOString(),
   };

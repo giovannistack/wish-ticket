@@ -2,7 +2,7 @@
 
 Web app di ticketing per l'assistenza tecnica Wish. Tre aziende clienti (MODO SPA, RGR Components S.r.l., Riserva Naturale Canale Monterano) aprono ticket, e ognuna vede solo i propri. L'admin Wish attiva gli account e gestisce i ticket dalla dashboard.
 
-## Stato: fase 1 completata
+## Stato: fasi 1 e 3 completate
 
 - Registrazione con conferma email. L'account resta **in attesa** finché l'admin non lo attiva e non conferma l'azienda.
 - Accesso con access token da 15 minuti e refresh token revocabile in cookie httpOnly. Recupero password via email.
@@ -13,7 +13,16 @@ Web app di ticketing per l'assistenza tecnica Wish. Tre aziende clienti (MODO SP
 - Area admin: dashboard ticket con filtri per azienda e stato, utenti e accessi (attiva, rifiuta, disattiva).
 - Senza SMTP configurato, le email non vengono inviate ma scritte nel log, con il link (comodo in sviluppo).
 
-**Prossime fasi**: messaggi e allegati nei ticket (2), assegnazione, stati, note interne e storico (3), notifiche push/SSE e comunicazioni (4), report, apparati e collegamento con il calendario interventi (5).
+**Fase 3 – gestione dei ticket (admin)**
+- Pannello Gestione nel dettaglio ticket: stato, priorità, tecnico, intervento (remoto/on-site), tempo impiegato, soluzione.
+- "Prendi in carico" assegna il ticket a chi lo prende. Per segnare risolto serve la soluzione, che il cliente riceve via email.
+- Email automatica al cliente a ogni cambio di stato (in carico, in attesa cliente, risolto, chiuso, riaperto).
+- Note interne, mai visibili ai clienti. Storico completo di ogni modifica per l'admin; il cliente vede solo apertura, assegnazione e cambi di stato.
+- Dashboard: colonna tecnico e filtro "Assegnati a me".
+- Utenti e accessi: riquadro "Rifiutati e disattivati" con "Rimetti in attesa" ed "Elimina" (solo per chi non ha aperto ticket).
+- I tecnici sono gli account admin attivi. Per aggiungerne uno: `ADMIN_EMAIL=… ADMIN_PASSWORD=… npm run seed`.
+
+**Prossime fasi**: messaggi e allegati nei ticket (2), notifiche push/SSE e comunicazioni (4), report, apparati e collegamento con il calendario interventi (5).
 
 ## Struttura
 
@@ -24,6 +33,10 @@ packages/shared schemi Zod e tipi comuni a web e API
 deploy/windows  Caddyfile, servizi NSSM, aggiornamento, backup
 deploy/docker   Dockerfile e compose per Linux
 ```
+
+## Il file .env
+
+L'app legge da sola il file `.env` nella cartella principale, con qualunque comando di avvio (`npm start`, `node apps/api/dist/server.js`, servizio NSSM). Le variabili già impostate nel sistema hanno la precedenza.
 
 ## Sviluppo
 

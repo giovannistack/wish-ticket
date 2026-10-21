@@ -5,9 +5,11 @@
  */
 import bcrypt from 'bcryptjs';
 import { passwordSchema } from '@wish/shared';
-import { caricaConfig } from './config.js';
+import { caricaConfig, caricaEnv } from './config.js';
 import { connettiDb, chiudiDb } from './db.js';
 import { AziendaModel, UtenteModel } from './models/index.js';
+
+caricaEnv();
 
 const AZIENDE = [
   { nome: 'MODO SPA', ragioneSociale: 'MODO S.p.A.' },

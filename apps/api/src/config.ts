@@ -1,4 +1,23 @@
+import fs from 'node:fs';
 import path from 'node:path';
+
+/**
+ * Carica il file .env della cartella principale, qualunque sia il comando di avvio
+ * (npm start, node …/server.js, servizio NSSM). Le variabili già impostate non vengono toccate.
+ */
+export function caricaEnv(): void {
+  const candidati = [path.resolve(process.cwd(), '.env'), path.resolve(import.meta.dirname, '../../../.env')];
+  const file = candidati.find((f) => fs.existsSync(f));
+  if (!file || process.env.NODE_ENV === 'test' || process.env.VITEST) return;
+  for (const riga of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const m = riga.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (!m) continue;
+    let valore = m[2]!;
+    if (/^(["']).*\1$/.test(valore)) valore = valore.slice(1, -1);
+    else valore = valore.replace(/\s+#.*$/, '');
+    if (process.env[m[1]!] === undefined) process.env[m[1]!] = valore;
+  }
+}
 
 function richiesto(nome: string, valoreDev?: string): string {
   const v = process.env[nome];

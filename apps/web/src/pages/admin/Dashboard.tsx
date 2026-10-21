@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { STATI_TICKET, STATO_TICKET_LABEL, type AziendaConStatsDTO, type StatoTicket, type TicketDTO } from '@wish/shared';
 import { api } from '../../api';
 import { Avviso, Caricamento, Icona, PrioritaPill, StatoPill, Vuoto, dataBreve } from '../../components/ui';
-import { SchedaTicket } from '../cliente/DettaglioTicket';
+import { useAuth } from '../../auth';
 
 const KPI: Array<{ stato: StatoTicket; etichetta: string; sotto: string; colore: string }> = [
   { stato: 'nuovo', etichetta: 'Nuovi', sotto: 'da prendere in carico', colore: '#1747c9' },
@@ -18,6 +18,8 @@ export default function Dashboard() {
   const [aziendaId, setAziendaId] = useState('');
   const [stato, setStato] = useState<StatoTicket | ''>('');
   const [cerca, setCerca] = useState('');
+  const [soloMiei, setSoloMiei] = useState(false);
+  const { utente } = useAuth();
 
   const aziende = useQuery({ queryKey: ['admin', 'aziende'], queryFn: () => api<AziendaConStatsDTO[]>('/admin/aziende') });
   const tutti = useQuery({
@@ -32,9 +34,10 @@ export default function Dashboard() {
       (t) =>
         (!aziendaId || t.azienda.id === aziendaId) &&
         (!stato || t.stato === stato) &&
+        (!soloMiei || t.tecnico?.id === utente?.id) &&
         (!q || [t.numero, t.oggetto, t.seriale, t.marcaModello, t.richiedente.nome].some((v) => v.toLowerCase().includes(q))),
     );
-  }, [tutti.data, aziendaId, stato, cerca]);
+  }, [tutti.data, aziendaId, stato, cerca, soloMiei, utente?.id]);
 
   const conteggio = (s: StatoTicket) => (tutti.data ?? []).filter((t) => t.stato === s && (!aziendaId || t.azienda.id === aziendaId)).length;
   const bloccanti = (tutti.data ?? []).filter((t) => t.priorita === 'bloccante' && t.stato === 'nuovo');
@@ -110,6 +113,15 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-pressed={soloMiei}
+            onClick={() => setSoloMiei(!soloMiei)}
+            className={`h-10 rounded-[10px] px-3 text-[13px] font-semibold ${soloMiei ? 'border-[1.5px] border-brand bg-brand-chiaro text-brand-scuro' : 'border border-bordo bg-white text-testo'}`}
+          >
+            Assegnati a me
+          </button>
           <label className="flex items-center gap-2 text-[13px] text-muto">
             <span className="sr-only">Filtra per stato</span>
             <select value={stato} onChange={(e) => setStato(e.target.value as StatoTicket | '')} className="h-10 rounded-[10px] border border-bordo bg-white px-2.5 text-[13px] text-inchiostro">
@@ -121,6 +133,7 @@ export default function Dashboard() {
               ))}
             </select>
           </label>
+          </div>
         </div>
 
         {tutti.isError && <div className="p-5"><Avviso>{(tutti.error as Error).message}</Avviso></div>}
@@ -130,13 +143,14 @@ export default function Dashboard() {
           <Vuoto titolo="Nessun ticket">Con questi filtri non ci sono ticket.</Vuoto>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] border-collapse text-sm">
+            <table className="w-full min-w-[900px] border-collapse text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-[0.8px] text-muto">
                   <th className="px-5 py-3 font-semibold">Ticket</th>
                   <th className="px-3 py-3 font-semibold">Oggetto</th>
                   <th className="px-3 py-3 font-semibold">Priorità</th>
                   <th className="px-3 py-3 font-semibold">Stato</th>
+                  <th className="px-3 py-3 font-semibold">Tecnico</th>
                   <th className="px-5 py-3 text-right font-semibold">Aperto</th>
                 </tr>
               </thead>
@@ -159,6 +173,7 @@ export default function Dashboard() {
                     </td>
                     <td className="px-3 py-3.5 align-top"><PrioritaPill priorita={t.priorita} /></td>
                     <td className="px-3 py-3.5 align-top"><StatoPill stato={t.stato} /></td>
+                    <td className="px-3 py-3.5 align-top text-testo">{t.tecnico?.nome ?? <span className="text-muto">—</span>}</td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right align-top text-muto">{dataBreve(t.createdAt)}</td>
                   </tr>
                 ))}
@@ -167,24 +182,6 @@ export default function Dashboard() {
           </div>
         )}
       </section>
-    </div>
-  );
-}
-
-export function DettaglioTicketAdmin() {
-  const { id } = useParams();
-  const q = useQuery({ queryKey: ['admin', 'ticket', id], queryFn: () => api<TicketDTO>(`/admin/ticket/${id}`) });
-  return (
-    <div className="flex max-w-3xl flex-col gap-4">
-      <Link to="/admin" className="flex w-fit items-center gap-1.5 rounded-lg text-sm font-semibold text-brand">
-        <Icona nome="indietro" dimensione={16} /> Tutti i ticket
-      </Link>
-      {q.isLoading && <Caricamento />}
-      {q.isError && <Avviso>Ticket non trovato.</Avviso>}
-      {q.data && <SchedaTicket t={q.data} />}
-      {q.data && (
-        <Avviso tipo="info">Assegnazione, cambio di stato, note interne e messaggi arrivano nella fase 3.</Avviso>
-      )}
     </div>
   );
 }

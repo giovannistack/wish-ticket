@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { attivaUtenteSchema, objectIdSchema, STATI_UTENTE } from '@wish/shared';
-import { AziendaModel, RefreshTokenModel, StoricoModel, UtenteModel } from '../../models/index.js';
+import { AziendaModel, RefreshTokenModel, StoricoModel, TicketModel, UtenteModel } from '../../models/index.js';
 import { valida } from '../../lib/valida.js';
 import { ErroreApi, nonTrovato, vietato } from '../../lib/errori.js';
 import { utenteDTO } from '../../lib/dto.js';
@@ -93,6 +93,33 @@ const routes: FastifyPluginAsync = async (app) => {
       ],
     });
     return dto(u._id);
+  });
+
+  /** Un indirizzo rifiutato o disattivato torna tra le richieste da attivare. */
+  app.post<{ Params: { id: string } }>('/:id/rimetti-in-attesa', async (req) => {
+    const u = await trova(req.params.id);
+    if (u.stato !== 'rifiutato' && u.stato !== 'disattivato') {
+      throw new ErroreApi(409, 'Solo utenti rifiutati o disattivati', 'STATO');
+    }
+    if (!u.aziendaDichiarataId && u.aziendaId) u.aziendaDichiarataId = u.aziendaId;
+    u.stato = 'in_attesa';
+    u.aziendaId = null;
+    await u.save();
+    await StoricoModel.create({ autoreId: req.utente.id, azione: 'utente_rimesso_in_attesa', dettagli: { utenteId: String(u._id) } });
+    return dto(u._id);
+  });
+
+  /** Elimina un indirizzo non attivo, che così può registrarsi di nuovo. Chi ha ticket si disattiva, non si elimina. */
+  app.delete<{ Params: { id: string } }>('/:id', async (req) => {
+    const u = await trova(req.params.id);
+    if (u.stato === 'attivo') throw new ErroreApi(409, 'Disattiva l\'utente prima di eliminarlo', 'STATO');
+    if (await TicketModel.exists({ richiedenteId: u._id })) {
+      throw new ErroreApi(409, 'L\'utente ha aperto dei ticket: lascialo disattivato per conservarne lo storico', 'HA_TICKET');
+    }
+    await RefreshTokenModel.deleteMany({ utenteId: u._id });
+    await UtenteModel.deleteOne({ _id: u._id });
+    await StoricoModel.create({ autoreId: req.utente.id, azione: 'utente_eliminato', dettagli: { email: u.email } });
+    return { ok: true };
   });
 
   app.post<{ Params: { id: string } }>('/:id/disattiva', async (req) => {

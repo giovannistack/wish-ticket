@@ -67,6 +67,13 @@ export const STATO_TICKET_LABEL: Record<StatoTicket, string> = {
   chiuso: 'Chiuso',
 };
 
+export const MODALITA = ['remoto', 'onsite'] as const;
+export type Modalita = (typeof MODALITA)[number];
+export const MODALITA_LABEL: Record<Modalita, string> = { remoto: 'Da remoto', onsite: 'On-site' };
+
+/** Stati che contano come "aperti" per i conteggi e i filtri. */
+export const STATI_APERTI: StatoTicket[] = ['nuovo', 'in_carico', 'in_attesa_cliente'];
+
 export const DISPONIBILITA = ['prima_possibile', 'mattina', 'pomeriggio'] as const;
 export type Disponibilita = (typeof DISPONIBILITA)[number];
 export const DISPONIBILITA_LABEL: Record<Disponibilita, string> = {
@@ -146,6 +153,20 @@ export const nuovaAziendaSchema = z.object({
   sede: z.string().trim().max(160).optional().default(''),
 });
 
+export const aggiornaTicketSchema = z
+  .object({
+    stato: z.enum(STATI_TICKET).optional(),
+    priorita: z.enum(PRIORITA).optional(),
+    tecnicoId: objectIdSchema.nullable().optional(),
+    modalita: z.enum(MODALITA).nullable().optional(),
+    tempoMinuti: z.number().int('Minuti interi').min(0).max(100_000).optional(),
+    soluzione: z.string().trim().max(5000).optional(),
+  })
+  .refine((d) => Object.keys(d).length > 0, { message: 'Nessuna modifica' });
+export type AggiornaTicketInput = z.input<typeof aggiornaTicketSchema>;
+
+export const notaSchema = z.object({ testo: testo(1, 5000, 'Nota') });
+
 // ---------- Tipi delle risposte API ----------
 
 export interface UtenteDTO {
@@ -192,8 +213,39 @@ export interface TicketDTO {
   stato: StatoTicket;
   disponibilita: Disponibilita;
   telefono: string;
+  tecnico: { id: string; nome: string } | null;
+  modalita: Modalita | null;
+  soluzione: string;
+  chiusoIl: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface EventoStoricoDTO {
+  id: string;
+  azione: string;
+  descrizione: string;
+  autore: string;
+  data: string;
+}
+
+export interface NotaDTO {
+  id: string;
+  testo: string;
+  autore: string;
+  data: string;
+}
+
+/** Dettaglio ticket per l'admin: in più tempo, note interne e storico completo. */
+export interface TicketAdminDTO extends TicketDTO {
+  tempoMinuti: number;
+  note: NotaDTO[];
+  storico: EventoStoricoDTO[];
+}
+
+export interface TecnicoDTO {
+  id: string;
+  nome: string;
 }
 
 export interface LoginResponse {

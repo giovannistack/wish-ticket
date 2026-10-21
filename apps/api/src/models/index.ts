@@ -2,6 +2,7 @@ import mongoose, { Schema, type InferSchemaType, type HydratedDocument } from 'm
 import {
   CATEGORIE,
   DISPONIBILITA,
+  MODALITA,
   PRIORITA,
   RUOLI,
   STATI_TICKET,
@@ -93,6 +94,9 @@ const ticketSchema = new Schema(
     disponibilita: { type: String, enum: DISPONIBILITA, default: 'prima_possibile' },
     telefono: { type: String, default: '' },
     tecnicoId: { type: ObjectId, ref: 'Utente', default: null },
+    modalita: { type: String, enum: [...MODALITA, null], default: null },
+    tempoMinuti: { type: Number, default: 0 },
+    soluzione: { type: String, default: '' },
     chiusoIl: { type: Date, default: null },
   },
   { timestamps: true },
@@ -100,8 +104,22 @@ const ticketSchema = new Schema(
 ticketSchema.index({ numero: 1 }, { unique: true });
 ticketSchema.index({ aziendaId: 1, stato: 1, createdAt: -1 });
 ticketSchema.index({ stato: 1, createdAt: -1 });
+ticketSchema.index({ tecnicoId: 1, stato: 1 });
 export type Ticket = InferSchemaType<typeof ticketSchema>;
 export const TicketModel = mongoose.model('Ticket', ticketSchema, 'ticket');
+
+// ---------- Note interne (solo Wish, mai visibili ai clienti) ----------
+const notaSchema = new Schema(
+  {
+    ticketId: { type: ObjectId, ref: 'Ticket', required: true },
+    aziendaId: { type: ObjectId, ref: 'Azienda', required: true },
+    autoreId: { type: ObjectId, ref: 'Utente', required: true },
+    testo: { type: String, required: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+notaSchema.index({ ticketId: 1, createdAt: 1 });
+export const NotaModel = mongoose.model('Nota', notaSchema, 'note');
 
 // ---------- Storico modifiche ----------
 const storicoSchema = new Schema(

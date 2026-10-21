@@ -1,3 +1,5 @@
+import { caricaEnv } from './config.js';
+caricaEnv();
 import { buildApp } from './app.js';
 import { connettiDb, chiudiDb } from './db.js';
 import { RefreshTokenModel } from './models/index.js';

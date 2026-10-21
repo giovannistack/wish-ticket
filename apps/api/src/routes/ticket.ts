@@ -7,6 +7,7 @@ import { scoped } from '../plugins/auth.js';
 import { valida } from '../lib/valida.js';
 import { nonTrovato } from '../lib/errori.js';
 import { ticketDTO } from '../lib/dto.js';
+import { popolaTicket, storicoDi } from '../lib/ticket.js';
 
 const filtriSchema = z.object({
   stato: z.enum(STATI_TICKET).optional(),
@@ -22,24 +23,24 @@ const routes: FastifyPluginAsync = async (app) => {
     const filtro: Record<string, unknown> = { ...scoped(req) };
     if (f.stato) filtro.stato = f.stato;
     else if (f.aperti) filtro.stato = { $in: ['nuovo', 'in_carico', 'in_attesa_cliente'] };
-    const ticket = await TicketModel.find(filtro)
-      .sort({ createdAt: -1 })
-      .limit(300)
-      .populate('aziendaId', 'nome')
-      .populate('richiedenteId', 'nome cognome')
-      .lean();
+    const ticket = await popolaTicket(TicketModel.find(filtro).sort({ createdAt: -1 }).limit(300)).lean();
     return ticket.map(ticketDTO);
   });
 
   app.get<{ Params: { id: string } }>('/:id', async (req) => {
     if (!Types.ObjectId.isValid(req.params.id)) throw nonTrovato('Ticket');
-    const t = await TicketModel.findOne({ _id: req.params.id, ...scoped(req) })
-      .populate('aziendaId', 'nome')
-      .populate('richiedenteId', 'nome cognome')
-      .lean();
+    const t = await popolaTicket(TicketModel.findOne({ _id: req.params.id, ...scoped(req) })).lean();
     // Un ticket di un'altra azienda risponde 404: non si rivela nemmeno che esiste.
     if (!t) throw nonTrovato('Ticket');
     return ticketDTO(t);
+  });
+
+  /** Storico visibile al cliente: apertura, cambi di stato, assegnazione. Niente note interne. */
+  app.get<{ Params: { id: string } }>('/:id/storico', async (req) => {
+    if (!Types.ObjectId.isValid(req.params.id)) throw nonTrovato('Ticket');
+    const esiste = await TicketModel.exists({ _id: req.params.id, ...scoped(req) });
+    if (!esiste) throw nonTrovato('Ticket');
+    return storicoDi(req.params.id, true);
   });
 
   app.post('/', { config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, reply) => {
@@ -57,7 +58,7 @@ const routes: FastifyPluginAsync = async (app) => {
       }
     }
     const numero = ticket.numero;
-    await StoricoModel.create({ ticketId: ticket._id, aziendaId, autoreId: req.utente.id, azione: 'creato' });
+    await StoricoModel.create({ ticketId: ticket._id, aziendaId, autoreId: req.utente.id, azione: 'creato', dettagli: { testo: 'Ticket aperto' } });
 
     const [azienda, richiedente] = await Promise.all([
       AziendaModel.findById(aziendaId, { nome: 1 }).lean(),
@@ -88,10 +89,7 @@ const routes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const completo = await TicketModel.findById(ticket._id)
-      .populate('aziendaId', 'nome')
-      .populate('richiedenteId', 'nome cognome')
-      .lean();
+    const completo = await popolaTicket(TicketModel.findById(ticket._id)).lean();
     return reply.status(201).send(ticketDTO(completo));
   });
 };

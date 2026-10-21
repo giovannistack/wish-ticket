@@ -74,6 +74,56 @@ function RichiestaInAttesa({ u, aziende }: { u: UtenteDTO; aziende: AziendaConSt
   );
 }
 
+function NonAttivi() {
+  const qc = useQueryClient();
+  const rifiutati = useQuery({ queryKey: ['admin', 'utenti', 'rifiutato'], queryFn: () => api<UtenteDTO[]>('/admin/utenti?stato=rifiutato') });
+  const disattivati = useQuery({ queryKey: ['admin', 'utenti', 'disattivato'], queryFn: () => api<UtenteDTO[]>('/admin/utenti?stato=disattivato') });
+  const aggiorna = () => qc.invalidateQueries({ queryKey: ['admin'] });
+  const rimetti = useMutation({ mutationFn: (id: string) => api(`/admin/utenti/${id}/rimetti-in-attesa`, { method: 'POST' }), onSuccess: aggiorna });
+  const elimina = useMutation({ mutationFn: (id: string) => api(`/admin/utenti/${id}`, { method: 'DELETE' }), onSuccess: aggiorna });
+  const elenco = [...(rifiutati.data ?? []), ...(disattivati.data ?? [])];
+  const errore = (rimetti.error ?? elimina.error) as Error | null;
+  if (!elenco.length) return null;
+
+  return (
+    <section className="card overflow-hidden">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-riga px-5 py-4">
+        <h2 className="text-base font-extrabold">Rifiutati e disattivati</h2>
+        <span className="text-xs text-muto">Questi indirizzi non possono accedere né registrarsi di nuovo</span>
+      </div>
+      {errore && <div className="px-5 pt-4"><Avviso>{errore.message}</Avviso></div>}
+      {elenco.map((u) => (
+        <div key={u.id} className="flex flex-wrap items-center gap-3 border-t border-[#f0f3f8] px-5 py-3 first:border-t-0">
+          <div className="flex min-w-0 flex-[1_1_240px] flex-col">
+            <span className="font-bold">{u.nome} {u.cognome}</span>
+            <span className="truncate text-xs text-muto">
+              {u.email} · {u.azienda?.nome ?? u.aziendaDichiarata?.nome ?? '—'}
+            </span>
+          </div>
+          <span className={`pill ${u.stato === 'rifiutato' ? 'bg-[#fdecec] text-[#a31b1b]' : 'bg-[#f4f6fa] text-testo'}`}>
+            {u.stato === 'rifiutato' ? 'Rifiutato' : 'Disattivato'}
+          </span>
+          <div className="flex gap-2">
+            <button type="button" className="btn-secondario min-h-9 px-3 text-[13px]" disabled={rimetti.isPending} onClick={() => rimetti.mutate(u.id)}>
+              Rimetti in attesa
+            </button>
+            <button
+              type="button"
+              className="btn-pericolo min-h-9 px-3 text-[13px]"
+              disabled={elimina.isPending}
+              onClick={() => {
+                if (window.confirm(`Eliminare ${u.email}? Potrà registrarsi di nuovo da zero.`)) elimina.mutate(u.id);
+              }}
+            >
+              Elimina
+            </button>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 export default function Utenti() {
   const qc = useQueryClient();
   const [filtro, setFiltro] = useState('');
@@ -199,6 +249,8 @@ export default function Utenti() {
           </div>
         )}
       </section>
+
+      <NonAttivi />
     </div>
   );
 }

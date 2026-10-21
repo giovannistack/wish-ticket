@@ -18,7 +18,7 @@ import DettaglioTicket from './pages/cliente/DettaglioTicket';
 // L'area admin si scarica solo per chi è admin
 const LayoutAdmin = lazy(() => import('./components/LayoutAdmin'));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
-const DettaglioTicketAdmin = lazy(() => import('./pages/admin/Dashboard').then((m) => ({ default: m.DettaglioTicketAdmin })));
+const DettaglioTicketAdmin = lazy(() => import('./pages/admin/DettaglioTicket'));
 const Utenti = lazy(() => import('./pages/admin/Utenti'));
 
 function Protetta({ ruolo, children }: { ruolo: 'cliente' | 'admin'; children: ReactNode }) {
