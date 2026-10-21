@@ -22,6 +22,7 @@ const DettaglioTicketAdmin = lazy(() => import('./pages/admin/DettaglioTicket'))
 const Utenti = lazy(() => import('./pages/admin/Utenti'));
 const Team = lazy(() => import('./pages/admin/Team'));
 const Aziende = lazy(() => import('./pages/admin/Aziende'));
+const NuovoTicketAdmin = lazy(() => import('./pages/admin/NuovoTicket'));
 const SchedaAzienda = lazy(() => import('./pages/admin/Aziende').then((m) => ({ default: m.SchedaAzienda })));
 
 function Protetta({ ruolo, children }: { ruolo: 'cliente' | 'admin'; children: ReactNode }) {
@@ -63,6 +64,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'ticket/:id', element: <DettaglioTicketAdmin /> },
+      { path: 'nuovo-ticket', element: <NuovoTicketAdmin /> },
       { path: 'utenti', element: <Utenti /> },
       { path: 'team', element: <Team /> },
       { path: 'aziende', element: <Aziende /> },

@@ -152,6 +152,25 @@ const movimentoSchema = new Schema(
 movimentoSchema.index({ aziendaId: 1, createdAt: -1 });
 export const MovimentoModel = mongoose.model('Movimento', movimentoSchema, 'movimentiContratto');
 
+// ---------- Allegati dei ticket (file su disco, metadati qui) ----------
+const allegatoSchema = new Schema(
+  {
+    ticketId: { type: ObjectId, ref: 'Ticket', required: true },
+    aziendaId: { type: ObjectId, ref: 'Azienda', required: true },
+    autoreId: { type: ObjectId, ref: 'Utente', required: true },
+    daWish: { type: Boolean, default: false },
+    nomeOriginale: { type: String, required: true },
+    file: { type: String, required: true }, // nome casuale sul disco
+    mime: { type: String, required: true },
+    dimensione: { type: Number, required: true },
+    nota: { type: String, default: '' },
+    visibileCliente: { type: Boolean, default: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+allegatoSchema.index({ ticketId: 1, createdAt: 1 });
+export const AllegatoModel = mongoose.model('Allegato', allegatoSchema, 'allegati');
+
 // ---------- Storico modifiche ----------
 const storicoSchema = new Schema(
   {

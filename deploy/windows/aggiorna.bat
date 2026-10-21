@@ -23,6 +23,8 @@ if exist "%BASE%\precedente" rmdir /s /q "%BASE%\precedente"
 move "%BASE%\app" "%BASE%\precedente" >nul
 move "%BASE%\nuova" "%BASE%\app" >nul
 copy /y "%BASE%\precedente\.env" "%BASE%\app\.env" >nul
+REM Gli allegati restano: si spostano nella nuova versione
+if exist "%BASE%\precedente\data" move "%BASE%\precedente\data" "%BASE%\app\data" >nul
 %NSSM% start WishTicket
 echo Aggiornamento completato. La versione precedente e' in %BASE%\precedente
 exit /b 0

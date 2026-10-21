@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import {
   contrattoSchema,
+  modificaMovimentoSchema,
   nuovaAziendaSchema,
   rettificaSchema,
   rinnovoSchema,
@@ -192,6 +193,44 @@ const routes: FastifyPluginAsync = async (app) => {
       return aziendaDTO(aggiornata);
     },
   );
+
+  /**
+   * Modifica una riga del registro (solo super admin): motivo e/o numero di chiamate.
+   * Con aggiornaSaldo la differenza si applica anche alle chiamate rimaste.
+   */
+  app.patch<{ Params: { id: string; mid: string } }>('/:id/movimenti/:mid', superAdmin, async (req) => {
+    const { motivo, delta, aggiornaSaldo } = valida(modificaMovimentoSchema, req.body);
+    const a = await trova(req.params.id);
+    if (!Types.ObjectId.isValid(req.params.mid)) throw nonTrovato('Movimento');
+    const m = await MovimentoModel.findOne({ _id: req.params.mid, aziendaId: a._id });
+    if (!m) throw nonTrovato('Movimento');
+    const prima = m.toObject();
+
+    if (delta !== undefined && delta !== m.delta) {
+      // Le righe legate a un ticket seguono il ticket: lì si cambia la copertura, non il numero
+      if (m.ticketId && (m.tipo === 'scalata' || m.tipo === 'restituita')) {
+        throw new ErroreApi(409, 'Questa riga è legata a un ticket: puoi cambiarne solo il motivo, oppure usa "Fuori contratto" nel ticket', 'LEGATA_A_TICKET');
+      }
+      const differenza = delta - m.delta;
+      if (aggiornaSaldo) {
+        const filtro: Record<string, unknown> = { _id: a._id };
+        if (differenza < 0) filtro['contratto.residue'] = { $gte: -differenza };
+        const agg = await AziendaModel.findOneAndUpdate(filtro, { $inc: { 'contratto.residue': differenza } }, { returnDocument: 'after' }).lean();
+        if (!agg) throw new ErroreApi(409, `Non ci sono ${-differenza} chiamate disponibili per questa modifica`, 'SALDO_INSUFFICIENTE');
+        m.saldoDopo = m.saldoDopo + differenza;
+      }
+      m.delta = delta;
+    }
+    if (motivo !== undefined) m.motivo = motivo;
+    await m.save();
+    await StoricoModel.create({
+      aziendaId: a._id,
+      autoreId: req.utente.id,
+      azione: 'movimento_modificato',
+      dettagli: { prima, dopo: m.toObject(), saldoAggiornato: aggiornaSaldo },
+    });
+    return aziendaDTO(await AziendaModel.findById(a._id).lean());
+  });
 
   /** Sblocco di emergenza: il cliente può aprire N richieste anche a chiamate finite (fuori contratto). */
   app.post<{ Params: { id: string } }>('/:id/sblocco', superAdmin, async (req) => {

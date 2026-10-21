@@ -5,6 +5,8 @@ import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import multipart from '@fastify/multipart';
+import { MAX_ALLEGATO_MB } from '@wish/shared';
 import { caricaConfig, type Config } from './config.js';
 import { creaMailer, type Mailer } from './lib/mail.js';
 import { ErroreApi } from './lib/errori.js';
@@ -18,6 +20,7 @@ import adminUtentiRoutes from './routes/admin/utenti.js';
 import adminAziendeRoutes from './routes/admin/aziende.js';
 import adminTicketRoutes from './routes/admin/ticket.js';
 import adminTecniciRoutes from './routes/admin/tecnici.js';
+import allegatiRoutes from './routes/allegati.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -61,6 +64,7 @@ export async function buildApp(opzioni: OpzioniApp = {}): Promise<FastifyInstanc
   });
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
+  await app.register(multipart, { limits: { fileSize: MAX_ALLEGATO_MB * 1024 * 1024, files: 1, fields: 5, fieldSize: 2000 } });
   await app.register(authPlugin);
 
   app.setErrorHandler((err, req, reply) => {
@@ -92,6 +96,7 @@ export async function buildApp(opzioni: OpzioniApp = {}): Promise<FastifyInstanc
       await api.register(adminAziendeRoutes, { prefix: '/admin/aziende' });
       await api.register(adminTicketRoutes, { prefix: '/admin/ticket' });
       await api.register(adminTecniciRoutes, { prefix: '/admin/tecnici' });
+      await api.register(allegatiRoutes, { prefix: '/allegati' });
       api.setNotFoundHandler((_req, reply) => reply.status(404).send({ errore: 'Percorso non trovato', codice: 'NON_TROVATO' }));
     },
     { prefix: '/api' },

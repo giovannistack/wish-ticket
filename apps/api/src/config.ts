@@ -37,6 +37,8 @@ export interface Config {
   refreshTokenGiorni: number;
   bcryptCosto: number;
   cartellaWeb: string;
+  /** Dove si salvano gli allegati: fuori dal codice, così sopravvivono agli aggiornamenti. */
+  cartellaAllegati: string;
   smtp: {
     host: string;
     porta: number;
@@ -63,6 +65,7 @@ export function caricaConfig(override: Partial<Config> = {}): Config {
     accessTokenMinuti: Number(process.env.ACCESS_TOKEN_MINUTI ?? 15),
     refreshTokenGiorni: Number(process.env.REFRESH_TOKEN_GIORNI ?? 30),
     bcryptCosto: Number(process.env.BCRYPT_COSTO ?? 12),
+    cartellaAllegati: process.env.CARTELLA_ALLEGATI ?? path.resolve(import.meta.dirname, '../../../data/allegati'),
     cartellaWeb:
       process.env.CARTELLA_WEB ?? path.resolve(import.meta.dirname, '../../web/dist'),
     smtp: smtpHost

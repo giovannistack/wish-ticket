@@ -19,6 +19,7 @@ import {
 import { api, ErroreHttp } from '../../api';
 import { useAuth } from '../../auth';
 import { Storico } from '../../components/Storico';
+import { Allegati } from '../../components/Allegati';
 import { Avviso, Caricamento, Icona, dataBreve } from '../../components/ui';
 import { BoxSoluzione, SchedaTicket } from '../cliente/DettaglioTicket';
 
@@ -136,6 +137,7 @@ export default function DettaglioTicketAdmin() {
         <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-4">
           <BoxSoluzione t={t} />
           <SchedaTicket t={t} />
+          <Allegati allegati={t.allegati} percorsoUpload={`/admin/ticket/${t.id}/allegati`} admin onCambio={() => q.refetch()} />
 
           <section className="card flex flex-col gap-3 p-5">
             <div className="flex items-baseline justify-between gap-2">

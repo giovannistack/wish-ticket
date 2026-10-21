@@ -12,9 +12,10 @@ import {
 } from '@wish/shared';
 import { NotaModel, StoricoModel, TicketModel } from '../models/index.js';
 import { ticketDTO } from './dto.js';
+import { elencoAllegati } from './allegati.js';
 
 /** Eventi dello storico che anche il cliente può vedere. */
-export const AZIONI_PUBBLICHE = ['creato', 'stato', 'assegnato', 'contratto'];
+export const AZIONI_PUBBLICHE = ['creato', 'stato', 'assegnato', 'contratto', 'allegato'];
 
 const nomeDi = (u: unknown) => {
   const p = u as { nome?: string; cognome?: string } | null;
@@ -67,9 +68,10 @@ export async function storicoDi(ticketId: Types.ObjectId | string, soloPubblico 
 export async function ticketAdmin(id: Types.ObjectId | string): Promise<TicketAdminDTO | null> {
   const t = await popolaTicket(TicketModel.findById(id)).lean();
   if (!t) return null;
-  const [note, storico] = await Promise.all([
+  const [note, storico, allegati] = await Promise.all([
     NotaModel.find({ ticketId: id }).sort({ createdAt: 1 }).populate('autoreId', 'nome cognome').lean(),
     storicoDi(id),
+    elencoAllegati(id, false),
   ]);
-  return { ...ticketDTO(t), tempoMinuti: t.tempoMinuti ?? 0, note: note.map(notaDTO), storico };
+  return { ...ticketDTO(t), tempoMinuti: t.tempoMinuti ?? 0, allegati, note: note.map(notaDTO), storico };
 }

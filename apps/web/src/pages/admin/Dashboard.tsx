@@ -56,6 +56,12 @@ export default function Dashboard() {
           </span>
           <h1 className="text-[28px] font-extrabold tracking-tight">Ticket di assistenza</h1>
         </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+        {utente?.superAdmin && (
+          <Link to="/admin/nuovo-ticket" className="btn-primario">
+            <Icona nome="piu" dimensione={18} /> Nuovo ticket
+          </Link>
+        )}
         <label className="flex h-11 min-w-[260px] flex-1 items-center gap-2.5 rounded-xl border border-bordo bg-white px-3.5 text-muto sm:flex-none">
           <Icona nome="cerca" />
           <span className="sr-only">Cerca</span>
@@ -67,6 +73,7 @@ export default function Dashboard() {
             className="min-w-0 flex-1 bg-transparent text-sm text-inchiostro outline-none"
           />
         </label>
+        </div>
       </div>
 
       {bloccanti.map((t) => (

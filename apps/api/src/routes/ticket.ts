@@ -1,14 +1,16 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { nuovoTicketSchema, PRIORITA_LABEL, STATI_TICKET } from '@wish/shared';
-import { AziendaModel, StoricoModel, TicketModel, UtenteModel, prossimoNumeroTicket } from '../models/index.js';
+import { nuovoTicketSchema, STATI_TICKET } from '@wish/shared';
+import { AziendaModel, StoricoModel, TicketModel } from '../models/index.js';
 import { scoped } from '../plugins/auth.js';
 import { valida } from '../lib/valida.js';
 import { nonTrovato } from '../lib/errori.js';
 import { ticketDTO } from '../lib/dto.js';
 import { popolaTicket, storicoDi } from '../lib/ticket.js';
-import { annullaPrenotazione, contrattoDTO, prenotaChiamata, registra } from '../lib/contratto.js';
+import { contrattoDTO } from '../lib/contratto.js';
+import { creaTicket } from '../lib/creaTicket.js';
+import { elencoAllegati, salvaAllegato } from '../lib/allegati.js';
 
 const filtriSchema = z.object({
   stato: z.enum(STATI_TICKET).optional(),
@@ -53,91 +55,40 @@ const routes: FastifyPluginAsync = async (app) => {
   app.post('/', { config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, reply) => {
     const dati = valida(nuovoTicketSchema, req.body);
     const { aziendaId } = scoped(req); // mai dal body
-
-    // Contratto: scala una chiamata (o usa uno sblocco di emergenza) prima di creare il ticket
-    const esito = await prenotaChiamata(aziendaId);
-    const contratto = {
-      chiamataScalata: esito.tipo === 'scalata',
-      fuoriContratto: esito.tipo !== 'scalata',
-    };
-
-    // Il numero è unico (indice): in caso di collisione si prende il successivo.
-    let ticket;
-    try {
-      for (let tentativo = 0; ; tentativo++) {
-        const numero = await prossimoNumeroTicket();
-        try {
-          ticket = await TicketModel.create({ ...dati, ...contratto, numero, aziendaId, richiedenteId: req.utente.id });
-          break;
-        } catch (err) {
-          if ((err as { code?: number }).code !== 11000 || tentativo >= 9) throw err;
-        }
-      }
-    } catch (err) {
-      await annullaPrenotazione(aziendaId, esito);
-      throw err;
-    }
-    const numero = ticket.numero;
-    await StoricoModel.create({ ticketId: ticket._id, aziendaId, autoreId: req.utente.id, azione: 'creato', dettagli: { testo: 'Ticket aperto' } });
-    if (esito.tipo === 'scalata') {
-      await registra({ aziendaId, tipo: 'scalata', delta: -1, saldoDopo: esito.saldo, motivo: 'Apertura ticket', autoreId: req.utente.id, ticket });
-      if (esito.saldo === 0) {
-        const az = await AziendaModel.findById(aziendaId, { nome: 1 }).lean();
-        await app.mailer.invia({
-          a: app.cfg.emailAvvisiAdmin,
-          oggetto: `${az?.nome}: chiamate del contratto esaurite`,
-          titolo: 'Chiamate esaurite',
-          paragrafi: [
-            `Con il ticket ${ticket.numero}, ${az?.nome} ha usato l'ultima chiamata inclusa nel contratto.`,
-            'Da ora non può aprire nuovi ticket finché non rinnovi il contratto, aggiungi chiamate o concedi uno sblocco di emergenza.',
-          ],
-          bottone: { testo: 'Apri le aziende', url: `${app.cfg.urlPubblico}/admin/aziende` },
-        });
-      }
-    } else if (esito.tipo === 'sblocco') {
-      await registra({
-        aziendaId,
-        tipo: 'sblocco_usato',
-        delta: 0,
-        saldoDopo: esito.saldo,
-        motivo: `Richiesta di emergenza a chiamate esaurite (sblocchi rimasti: ${esito.sblocchiRimasti})`,
-        autoreId: req.utente.id,
-        ticket,
-      });
-    }
-
-    const [azienda, richiedente] = await Promise.all([
-      AziendaModel.findById(aziendaId, { nome: 1 }).lean(),
-      UtenteModel.findById(req.utente.id, { nome: 1, cognome: 1, email: 1 }).lean(),
-    ]);
-    const bloccante = dati.priorita === 'bloccante';
-    await app.mailer.invia({
-      a: app.cfg.emailAvvisiAdmin,
-      oggetto: `${bloccante ? '[BLOCCANTE] ' : ''}${numero} · ${azienda?.nome}: ${dati.oggetto}`,
-      titolo: `Nuovo ticket ${numero}`,
-      paragrafi: [
-        `${richiedente?.nome} ${richiedente?.cognome} (${azienda?.nome}) ha aperto un ticket con priorità ${PRIORITA_LABEL[dati.priorita].nome.toLowerCase()}.`,
-        dati.oggetto,
-        dati.descrizione,
-      ],
-      bottone: { testo: 'Apri la dashboard', url: `${app.cfg.urlPubblico}/admin` },
-    });
-    if (richiedente) {
-      await app.mailer.invia({
-        a: richiedente.email,
-        oggetto: `Ticket ${numero} ricevuto · Wish Assistenza`,
-        titolo: `Abbiamo ricevuto il ticket ${numero}`,
-        paragrafi: [
-          `"${dati.oggetto}"`,
-          'Il team Wish lo prenderà in carico al più presto. Ti avviseremo a ogni aggiornamento.',
-        ],
-        bottone: { testo: 'Vedi il ticket', url: `${app.cfg.urlPubblico}/ticket/${ticket._id}` },
-      });
-    }
-
-    const completo = await popolaTicket(TicketModel.findById(ticket._id)).lean();
-    return reply.status(201).send(ticketDTO(completo));
+    const t = await creaTicket(app, { dati, aziendaId, richiedenteId: req.utente.id, autoreId: req.utente.id });
+    return reply.status(201).send(t);
   });
+
+  // ---------- Allegati ----------
+
+  const ticketDelCliente = async (id: string, req: Parameters<typeof scoped>[0]) => {
+    if (!Types.ObjectId.isValid(id)) throw nonTrovato('Ticket');
+    const t = await TicketModel.findOne({ _id: id, ...scoped(req) }, { aziendaId: 1, numero: 1, oggetto: 1 }).lean();
+    if (!t) throw nonTrovato('Ticket');
+    return t;
+  };
+
+  app.get<{ Params: { id: string } }>('/:id/allegati', async (req) => {
+    const t = await ticketDelCliente(req.params.id, req);
+    return elencoAllegati(t._id, true);
+  });
+
+  app.post<{ Params: { id: string } }>(
+    '/:id/allegati',
+    { config: { rateLimit: { max: 60, timeWindow: '1 hour' } } },
+    async (req, reply) => {
+      const t = await ticketDelCliente(req.params.id, req);
+      const a = await salvaAllegato(app, req, t, { daWish: false, puoNascondere: false });
+      await StoricoModel.create({
+        ticketId: t._id,
+        aziendaId: t.aziendaId,
+        autoreId: req.utente.id,
+        azione: 'allegato',
+        dettagli: { testo: `Allegato aggiunto: ${a.nomeOriginale}` },
+      });
+      return reply.status(201).send(await elencoAllegati(t._id, true));
+    },
+  );
 };
 
 export default routes;

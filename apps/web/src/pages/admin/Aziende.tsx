@@ -291,6 +291,15 @@ function Registro({ id, posso }: { id: string; posso: boolean }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['admin', 'aziende', id, 'movimenti'], queryFn: () => api<MovimentoDTO[]>(`/admin/aziende/${id}/movimenti`) });
   const [daEliminare, setDaEliminare] = useState<string | null>(null);
+  const [inModifica, setInModifica] = useState<{ id: string; delta: number; motivo: string; aggiornaSaldo: boolean } | null>(null);
+  const modifica = useMutation({
+    mutationFn: (m: { id: string; body: Record<string, unknown> }) =>
+      api(`/admin/aziende/${id}/movimenti/${m.id}`, { method: 'PATCH', body: m.body }),
+    onSuccess: () => {
+      setInModifica(null);
+      qc.invalidateQueries({ queryKey: ['admin'] });
+    },
+  });
   const elimina = useMutation({
     mutationFn: ({ mid, ripristina }: { mid: string; ripristina: boolean }) =>
       api(`/admin/aziende/${id}/movimenti/${mid}${ripristina ? '?ripristina=1' : ''}`, { method: 'DELETE' }),
@@ -304,10 +313,10 @@ function Registro({ id, posso }: { id: string; posso: boolean }) {
       <div className="flex flex-col gap-1 border-b border-riga px-5 py-4">
         <h2 className="text-base font-extrabold">Registro chiamate</h2>
         <p className="text-[13px] text-muto">
-          Ogni movimento del contratto, dal più recente.{posso && ' Con il cestino puoi eliminare una riga, scegliendo se ripristinare anche il saldo.'}
+          Ogni movimento del contratto, dal più recente.{posso && ' Con la matita modifichi una riga, con il cestino la elimini: in entrambi i casi scegli se aggiornare anche il saldo.'}
         </p>
       </div>
-      {messaggio(elimina.error) && <div className="px-5 pt-4"><Avviso>{messaggio(elimina.error)}</Avviso></div>}
+      {messaggio(elimina.error ?? modifica.error) && <div className="px-5 pt-4"><Avviso>{messaggio(elimina.error ?? modifica.error)}</Avviso></div>}
       {q.isLoading ? (
         <Caricamento />
       ) : !q.data?.length ? (
@@ -323,7 +332,7 @@ function Registro({ id, posso }: { id: string; posso: boolean }) {
                 <th className="px-3 py-3 text-right font-semibold">Saldo</th>
                 <th className="px-3 py-3 font-semibold">Dettaglio</th>
                 <th className="px-5 py-3 font-semibold">Da</th>
-                {posso && <th className="w-14 px-3 py-3"><span className="sr-only">Azioni</span></th>}
+                {posso && <th className="w-24 px-3 py-3"><span className="sr-only">Azioni</span></th>}
               </tr>
             </thead>
             <tbody>
@@ -346,12 +355,27 @@ function Registro({ id, posso }: { id: string; posso: boolean }) {
                   </td>
                   <td className="px-5 py-3 text-muto">{m.autore}</td>
                   {posso && (
-                    <td className="px-3 py-2 text-right">
+                    <td className="flex justify-end px-3 py-2">
+                      <button
+                        type="button"
+                        aria-label="Modifica questa riga"
+                        title="Modifica riga"
+                        onClick={() => {
+                          setDaEliminare(null);
+                          setInModifica(inModifica?.id === m.id ? null : { id: m.id, delta: m.delta, motivo: m.motivo, aggiornaSaldo: true });
+                        }}
+                        className="flex size-10 items-center justify-center rounded-lg text-muto hover:bg-fondo hover:text-brand"
+                      >
+                        <Icona nome="matita" dimensione={16} />
+                      </button>
                       <button
                         type="button"
                         aria-label="Elimina questa riga"
                         title="Elimina riga"
-                        onClick={() => setDaEliminare(daEliminare === m.id ? null : m.id)}
+                        onClick={() => {
+                          setInModifica(null);
+                          setDaEliminare(daEliminare === m.id ? null : m.id);
+                        }}
                         className="flex size-10 items-center justify-center rounded-lg text-muto hover:bg-[#fff5f5] hover:text-[#a31b1b]"
                       >
                         <Icona nome="cestino" dimensione={17} />
@@ -359,6 +383,64 @@ function Registro({ id, posso }: { id: string; posso: boolean }) {
                     </td>
                   )}
                 </tr>
+                {inModifica?.id === m.id && (
+                  <tr className="bg-[#f2f6ff]">
+                    <td colSpan={7} className="px-5 pb-4">
+                      <form
+                        className="flex flex-wrap items-end gap-3"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const body: Record<string, unknown> = { motivo: inModifica.motivo };
+                          if (inModifica.delta !== m.delta) {
+                            body.delta = inModifica.delta;
+                            body.aggiornaSaldo = inModifica.aggiornaSaldo;
+                          }
+                          modifica.mutate({ id: m.id, body });
+                        }}
+                      >
+                        {(() => {
+                          const soloMotivo = !!m.ticket && (m.tipo === 'scalata' || m.tipo === 'restituita');
+                          return (
+                            <>
+                              <label className="flex w-28 flex-col gap-1">
+                                <span className="etichetta">Chiamate</span>
+                                <input
+                                  type="number"
+                                  className="campo h-11"
+                                  disabled={soloMotivo}
+                                  title={soloMotivo ? 'Riga legata a un ticket: usa "Fuori contratto" nel ticket' : undefined}
+                                  value={inModifica.delta}
+                                  onChange={(e) => setInModifica({ ...inModifica, delta: Number(e.target.value) || 0 })}
+                                />
+                              </label>
+                              <label className="flex min-w-[220px] flex-1 flex-col gap-1">
+                                <span className="etichetta">Motivo</span>
+                                <input className="campo h-11" value={inModifica.motivo} onChange={(e) => setInModifica({ ...inModifica, motivo: e.target.value })} />
+                              </label>
+                              {inModifica.delta !== m.delta && (
+                                <label className="flex min-h-11 items-center gap-2 text-[13px]">
+                                  <input
+                                    type="checkbox"
+                                    checked={inModifica.aggiornaSaldo}
+                                    onChange={(e) => setInModifica({ ...inModifica, aggiornaSaldo: e.target.checked })}
+                                    className="size-5 accent-brand"
+                                  />
+                                  Aggiorna anche il saldo ({inModifica.delta - m.delta > 0 ? '+' : ''}{inModifica.delta - m.delta})
+                                </label>
+                              )}
+                              <button type="submit" className="btn-primario" disabled={modifica.isPending || inModifica.motivo.trim().length < 3}>
+                                Salva
+                              </button>
+                              <button type="button" className="btn-secondario" onClick={() => setInModifica(null)}>
+                                Annulla
+                              </button>
+                            </>
+                          );
+                        })()}
+                      </form>
+                    </td>
+                  </tr>
+                )}
                 {daEliminare === m.id && (
                   <tr className="bg-[#fff5f5]">
                     <td colSpan={7} className="px-5 pb-4">

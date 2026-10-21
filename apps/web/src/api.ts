@@ -88,3 +88,42 @@ export async function api<T>(percorso: string, opzioni: Opzioni = {}, riprova = 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
+
+async function conRinnovo(fai: () => Promise<Response>, percorso: string): Promise<Response> {
+  let res: Response;
+  try {
+    res = await fai();
+  } catch {
+    throw new ErroreHttp(0, 'Connessione non disponibile. Controlla la rete e riprova.');
+  }
+  if (res.status === 401 && !percorso.startsWith('/auth/') && (await sessione.rinnova())) res = await fai();
+  if (!res.ok) {
+    let e: ApiErrore = { errore: res.status === 413 ? 'File troppo grande: massimo 10 MB' : 'Qualcosa è andato storto, riprova' };
+    try {
+      e = (await res.json()) as ApiErrore;
+    } catch {
+      /* risposta senza JSON */
+    }
+    throw new ErroreHttp(res.status, e.errore, e.codice, e.dettagli);
+  }
+  return res;
+}
+
+const intestazioni = (): Record<string, string> => (accessToken ? { authorization: `Bearer ${accessToken}` } : {});
+
+/** Upload di un file (multipart): i campi testuali vanno prima del file. */
+export async function apiUpload<T>(percorso: string, file: File, campi: Record<string, string> = {}): Promise<T> {
+  const res = await conRinnovo(() => {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(campi)) fd.append(k, v);
+    fd.append('file', file, file.name);
+    return fetch(`/api${percorso}`, { method: 'POST', headers: intestazioni(), credentials: 'same-origin', body: fd });
+  }, percorso);
+  return (await res.json()) as T;
+}
+
+/** Scarica un file protetto (serve il token, quindi niente link diretti). */
+export async function apiBlob(percorso: string): Promise<Blob> {
+  const res = await conRinnovo(() => fetch(`/api${percorso}`, { headers: intestazioni(), credentials: 'same-origin' }), percorso);
+  return res.blob();
+}

@@ -5,11 +5,13 @@ import {
   DISPONIBILITA_LABEL,
   MODALITA_LABEL,
   TIPO_APPARATO_LABEL,
+  type AllegatoDTO,
   type EventoStoricoDTO,
   type TicketDTO,
 } from '@wish/shared';
 import { api } from '../../api';
 import { Storico } from '../../components/Storico';
+import { Allegati } from '../../components/Allegati';
 import { Avviso, Caricamento, Icona, PrioritaPill, StatoPill, dataBreve } from '../../components/ui';
 
 export function SchedaTicket({ t }: { t: TicketDTO }) {
@@ -64,11 +66,18 @@ export function BoxSoluzione({ t }: { t: TicketDTO }) {
 
 export default function DettaglioTicket() {
   const { id } = useParams();
-  const creato = (useLocation().state as { creato?: boolean } | null)?.creato;
+  const statoNav = useLocation().state as { creato?: boolean; falliti?: string[] } | null;
+  const creato = statoNav?.creato;
   const q = useQuery({ queryKey: ['ticket', id], queryFn: () => api<TicketDTO>(`/ticket/${id}`), refetchInterval: 60_000 });
   const storico = useQuery({
     queryKey: ['ticket', id, 'storico'],
     queryFn: () => api<EventoStoricoDTO[]>(`/ticket/${id}/storico`),
+    enabled: q.isSuccess,
+    refetchInterval: 60_000,
+  });
+  const allegati = useQuery({
+    queryKey: ['ticket', id, 'allegati'],
+    queryFn: () => api<AllegatoDTO[]>(`/ticket/${id}/allegati`),
     enabled: q.isSuccess,
     refetchInterval: 60_000,
   });
@@ -91,7 +100,16 @@ export default function DettaglioTicket() {
             <Avviso tipo="info">Il tecnico ha bisogno di informazioni da te: rispondi all'email ricevuta o contatta Wish.</Avviso>
           )}
           <BoxSoluzione t={q.data} />
+          {!!statoNav?.falliti?.length && <Avviso>Alcuni allegati non sono stati caricati: {statoNav.falliti.join(' · ')}</Avviso>}
           <SchedaTicket t={q.data} />
+          <Allegati
+            allegati={allegati.data ?? []}
+            percorsoUpload={`/ticket/${id}/allegati`}
+            onCambio={() => {
+              allegati.refetch();
+              storico.refetch();
+            }}
+          />
           <Storico eventi={storico.data ?? []} />
         </>
       )}

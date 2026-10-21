@@ -214,6 +214,26 @@ export const aggiornaTecnicoSchema = z
   })
   .refine((d) => Object.keys(d).length > 0, { message: 'Nessuna modifica' });
 
+export const MIME_ALLEGATI = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] as const;
+export const MAX_ALLEGATO_MB = 10;
+
+/** Ticket aperto da Wish per conto di un cliente: stessi campi, più azienda e richiedente. */
+export const nuovoTicketAdminSchema = nuovoTicketSchema.extend({
+  aziendaId: objectIdSchema,
+  richiedenteId: objectIdSchema.optional(),
+  fuoriContratto: z.boolean().optional().default(false),
+});
+export type NuovoTicketAdminInput = z.input<typeof nuovoTicketAdminSchema>;
+
+export const modificaMovimentoSchema = z
+  .object({
+    motivo: z.string().trim().min(3, 'Motivo: almeno 3 caratteri').max(300).optional(),
+    delta: z.number().int('Numero intero').min(-1000).max(1000).optional(),
+    aggiornaSaldo: z.boolean().optional().default(true),
+  })
+  .refine((d) => d.motivo !== undefined || d.delta !== undefined, { message: 'Nessuna modifica' });
+export type ModificaMovimentoInput = z.input<typeof modificaMovimentoSchema>;
+
 // ---------- Tipi delle risposte API ----------
 
 export interface UtenteDTO {
@@ -312,6 +332,19 @@ export interface EventoStoricoDTO {
   data: string;
 }
 
+export interface AllegatoDTO {
+  id: string;
+  nome: string;
+  mime: string;
+  dimensione: number;
+  nota: string;
+  visibileCliente: boolean;
+  /** Chi l'ha caricato: cliente o team Wish. */
+  daWish: boolean;
+  autore: string;
+  data: string;
+}
+
 export interface NotaDTO {
   id: string;
   testo: string;
@@ -322,6 +355,7 @@ export interface NotaDTO {
 /** Dettaglio ticket per l'admin: in più tempo, note interne e storico completo. */
 export interface TicketAdminDTO extends TicketDTO {
   tempoMinuti: number;
+  allegati: AllegatoDTO[];
   note: NotaDTO[];
   storico: EventoStoricoDTO[];
 }

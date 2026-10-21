@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import os from 'node:os';
+import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import type { FastifyInstance } from 'fastify';
@@ -24,6 +26,7 @@ export async function avviaApp() {
       limiteRegistrazione: 1000,
       urlPubblico: 'https://ticket.test',
       cartellaWeb: '/non-esiste',
+      cartellaAllegati: path.join(os.tmpdir(), `wish-allegati-${crypto.randomBytes(4).toString('hex')}`),
     },
   });
   await connettiDb(app.cfg.mongoUri);
@@ -123,3 +126,15 @@ export const ticketDiProva = (oggetto: string) => ({
   descrizione: 'La stampante non stampa da stamattina.',
   priorita: 'media',
 });
+
+/** Corpo multipart per i test di upload: prima i campi, poi il file. */
+export async function multipart(file: { dati: Buffer; nome: string; tipo?: string }, campi: Record<string, string> = {}) {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(campi)) fd.append(k, v);
+  fd.append('file', new Blob([new Uint8Array(file.dati)], { type: file.tipo ?? 'application/octet-stream' }), file.nome);
+  const r = new Response(fd);
+  return { payload: Buffer.from(await r.arrayBuffer()), headers: { 'content-type': r.headers.get('content-type')! } };
+}
+
+export const JPG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 1)]);
+export const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF');

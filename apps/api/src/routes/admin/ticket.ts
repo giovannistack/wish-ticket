@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   aggiornaTicketSchema,
   notaSchema,
+  nuovoTicketAdminSchema,
   objectIdSchema,
   PRIORITA,
   PRIORITA_LABEL,
@@ -13,12 +14,14 @@ import {
   type Priorita,
   type StatoTicket,
 } from '@wish/shared';
-import { NotaModel, StoricoModel, TicketModel, UtenteModel } from '../../models/index.js';
+import { AziendaModel, NotaModel, StoricoModel, TicketModel, UtenteModel } from '../../models/index.js';
 import { valida } from '../../lib/valida.js';
 import { ErroreApi, nonTrovato, vietato } from '../../lib/errori.js';
 import { ticketDTO } from '../../lib/dto.js';
 import { popolaTicket, testoEvento, ticketAdmin } from '../../lib/ticket.js';
 import { restituisci, scala } from '../../lib/contratto.js';
+import { creaTicket } from '../../lib/creaTicket.js';
+import { eliminaAllegatiTicket, salvaAllegato } from '../../lib/allegati.js';
 
 const filtriSchema = z.object({
   aziendaId: objectIdSchema.optional(),
@@ -50,6 +53,57 @@ const routes: FastifyPluginAsync = async (app) => {
     }
     const ticket = await popolaTicket(TicketModel.find(filtro).sort({ createdAt: -1 }).limit(500)).lean();
     return ticket.map(ticketDTO);
+  });
+
+  /** Il super admin apre un ticket per conto di un cliente, con lo stesso modulo. */
+  app.post('/', { preHandler: app.soloSuperAdmin }, async (req, reply) => {
+    const { aziendaId, richiedenteId, fuoriContratto, ...dati } = valida(nuovoTicketAdminSchema, req.body);
+    const azienda = await AziendaModel.findById(aziendaId, { _id: 1 }).lean();
+    if (!azienda) throw new ErroreApi(400, 'Azienda non valida', 'AZIENDA_NON_VALIDA');
+    let richiedente = req.utente.id;
+    if (richiedenteId) {
+      const u = await UtenteModel.findOne({ _id: richiedenteId, aziendaId: azienda._id, stato: 'attivo' }, { _id: 1 }).lean();
+      if (!u) throw new ErroreApi(400, "Il richiedente non è un utente attivo di quest'azienda", 'RICHIEDENTE_NON_VALIDO');
+      richiedente = String(u._id);
+    }
+    const t = await creaTicket(app, {
+      dati,
+      aziendaId: azienda._id,
+      richiedenteId: richiedente,
+      autoreId: req.utente.id,
+      daWish: true,
+      fuoriContratto,
+    });
+    return reply.status(201).send(t);
+  });
+
+  app.post<{ Params: { id: string } }>('/:id/allegati', async (req, reply) => {
+    if (!Types.ObjectId.isValid(req.params.id)) throw nonTrovato('Ticket');
+    const t = await popolaTicket(TicketModel.findById(req.params.id)).lean();
+    if (!t) throw nonTrovato('Ticket');
+    const a = await salvaAllegato(app, req, t, { daWish: true, puoNascondere: true });
+    await StoricoModel.create({
+      ticketId: t._id,
+      aziendaId: t.aziendaId,
+      autoreId: req.utente.id,
+      azione: a.visibileCliente ? 'allegato' : 'allegato_interno',
+      dettagli: { testo: `${a.visibileCliente ? 'Allegato' : 'Allegato interno'} aggiunto: ${a.nomeOriginale}` },
+    });
+    // Il cliente viene avvisato dei documenti che può vedere
+    const richiedente = t.richiedenteId as { _id?: unknown } | null;
+    if (a.visibileCliente && richiedente?._id) {
+      const u = await UtenteModel.findById(richiedente._id, { email: 1, ruolo: 1, stato: 1 }).lean();
+      if (u && u.ruolo !== 'admin' && u.stato === 'attivo') {
+        await app.mailer.invia({
+          a: u.email,
+          oggetto: `${t.numero}: nuovo documento da Wish`,
+          titolo: `Nuovo documento sul ticket ${t.numero}`,
+          paragrafi: [`Il team Wish ha aggiunto "${a.nomeOriginale}".`, ...(a.nota ? [a.nota] : [])],
+          bottone: { testo: 'Vedi il ticket', url: `${app.cfg.urlPubblico}/ticket/${t._id}` },
+        });
+      }
+    }
+    return reply.status(201).send(await ticketAdmin(t._id));
   });
 
   app.get<{ Params: { id: string } }>('/:id', async (req) => {
@@ -148,7 +202,7 @@ const routes: FastifyPluginAsync = async (app) => {
     const t = await TicketModel.findById(req.params.id, { numero: 1, oggetto: 1, aziendaId: 1, chiamataScalata: 1 }).lean();
     if (!t) throw nonTrovato('Ticket');
     if (t.chiamataScalata) await restituisci(t.aziendaId, { _id: t._id, numero: t.numero }, req.utente.id, 'Ticket eliminato');
-    await Promise.all([NotaModel.deleteMany({ ticketId: t._id }), StoricoModel.deleteMany({ ticketId: t._id })]);
+    await Promise.all([NotaModel.deleteMany({ ticketId: t._id }), StoricoModel.deleteMany({ ticketId: t._id }), eliminaAllegatiTicket(app, t._id)]);
     await TicketModel.deleteOne({ _id: t._id });
     await StoricoModel.create({
       aziendaId: t.aziendaId,

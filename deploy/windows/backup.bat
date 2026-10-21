@@ -17,6 +17,8 @@ if errorlevel 1 (
   echo Backup NON riuscito >> "%BASE%\logs\backup.log"
   exit /b 1
 )
+REM Copia degli allegati (solo i file nuovi o cambiati)
+if exist "%BASE%\app\data\allegati" robocopy "%BASE%\app\data\allegati" "%DEST%\allegati" /E /XO /NFL /NDL /NJH /NJS >nul
 echo %DATA% backup ok >> "%BASE%\logs\backup.log"
 
 REM Elimina i backup piu' vecchi di 14 giorni
