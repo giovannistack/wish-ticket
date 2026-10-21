@@ -10,7 +10,7 @@ import {
   STATI_APERTI,
   type AziendaConStatsDTO,
 } from '@wish/shared';
-import { AziendaModel, MovimentoModel, TicketModel, UtenteModel } from '../../models/index.js';
+import { AziendaModel, MovimentoModel, StoricoModel, TicketModel, UtenteModel } from '../../models/index.js';
 import { valida } from '../../lib/valida.js';
 import { ErroreApi, nonTrovato } from '../../lib/errori.js';
 import { aziendaDTO } from '../../lib/dto.js';
@@ -153,6 +153,45 @@ const routes: FastifyPluginAsync = async (app) => {
     });
     return aziendaDTO(a);
   });
+
+  /**
+   * Elimina una riga del registro (solo super admin).
+   * Con ?ripristina=1 annulla anche il suo effetto sul saldo e sul ticket collegato.
+   * La riga eliminata resta nel registro interno delle attività, per sicurezza.
+   */
+  app.delete<{ Params: { id: string; mid: string }; Querystring: { ripristina?: string } }>(
+    '/:id/movimenti/:mid',
+    superAdmin,
+    async (req) => {
+      const a = await trova(req.params.id);
+      if (!Types.ObjectId.isValid(req.params.mid)) throw nonTrovato('Movimento');
+      const m = await MovimentoModel.findOne({ _id: req.params.mid, aziendaId: a._id }).lean();
+      if (!m) throw nonTrovato('Movimento');
+      const ripristina = req.query.ripristina === '1' && m.delta !== 0;
+
+      if (ripristina) {
+        const inverso = -m.delta;
+        const filtro: Record<string, unknown> = { _id: a._id };
+        if (inverso < 0) filtro['contratto.residue'] = { $gte: -inverso };
+        const agg = await AziendaModel.findOneAndUpdate(filtro, { $inc: { 'contratto.residue': inverso } }, { returnDocument: 'after' }).lean();
+        if (!agg) {
+          throw new ErroreApi(409, `Per annullare questo movimento servono ${-inverso} chiamate disponibili: elimina solo la riga o aggiungi chiamate`, 'SALDO_INSUFFICIENTE');
+        }
+        // Il ticket collegato segue il saldo: una scalata annullata non conta più, una restituzione annullata torna a contare
+        if (m.ticketId && m.tipo === 'scalata') await TicketModel.updateOne({ _id: m.ticketId }, { $set: { chiamataScalata: false } });
+        if (m.ticketId && m.tipo === 'restituita') await TicketModel.updateOne({ _id: m.ticketId }, { $set: { chiamataScalata: true, fuoriContratto: false } });
+      }
+      await MovimentoModel.deleteOne({ _id: m._id });
+      await StoricoModel.create({
+        aziendaId: a._id,
+        autoreId: req.utente.id,
+        azione: 'movimento_eliminato',
+        dettagli: { movimento: m, saldoRipristinato: ripristina },
+      });
+      const aggiornata = await AziendaModel.findById(a._id).lean();
+      return aziendaDTO(aggiornata);
+    },
+  );
 
   /** Sblocco di emergenza: il cliente può aprire N richieste anche a chiamate finite (fuori contratto). */
   app.post<{ Params: { id: string } }>('/:id/sblocco', superAdmin, async (req) => {

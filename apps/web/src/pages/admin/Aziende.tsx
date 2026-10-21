@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -287,14 +287,27 @@ function Chiamate({ a, onFatto }: { a: AziendaDTO; onFatto: (a: AziendaDTO) => v
   );
 }
 
-function Registro({ id }: { id: string }) {
+function Registro({ id, posso }: { id: string; posso: boolean }) {
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: ['admin', 'aziende', id, 'movimenti'], queryFn: () => api<MovimentoDTO[]>(`/admin/aziende/${id}/movimenti`) });
+  const [daEliminare, setDaEliminare] = useState<string | null>(null);
+  const elimina = useMutation({
+    mutationFn: ({ mid, ripristina }: { mid: string; ripristina: boolean }) =>
+      api(`/admin/aziende/${id}/movimenti/${mid}${ripristina ? '?ripristina=1' : ''}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      setDaEliminare(null);
+      qc.invalidateQueries({ queryKey: ['admin'] });
+    },
+  });
   return (
     <section className="card flex flex-col overflow-hidden">
       <div className="flex flex-col gap-1 border-b border-riga px-5 py-4">
         <h2 className="text-base font-extrabold">Registro chiamate</h2>
-        <p className="text-[13px] text-muto">Ogni movimento del contratto, dal più recente. Non si può modificare.</p>
+        <p className="text-[13px] text-muto">
+          Ogni movimento del contratto, dal più recente.{posso && ' Con il cestino puoi eliminare una riga, scegliendo se ripristinare anche il saldo.'}
+        </p>
       </div>
+      {messaggio(elimina.error) && <div className="px-5 pt-4"><Avviso>{messaggio(elimina.error)}</Avviso></div>}
       {q.isLoading ? (
         <Caricamento />
       ) : !q.data?.length ? (
@@ -310,11 +323,13 @@ function Registro({ id }: { id: string }) {
                 <th className="px-3 py-3 text-right font-semibold">Saldo</th>
                 <th className="px-3 py-3 font-semibold">Dettaglio</th>
                 <th className="px-5 py-3 font-semibold">Da</th>
+                {posso && <th className="w-14 px-3 py-3"><span className="sr-only">Azioni</span></th>}
               </tr>
             </thead>
             <tbody>
               {q.data.map((m) => (
-                <tr key={m.id} className="border-t border-riga align-top">
+                <Fragment key={m.id}>
+                <tr className={`border-t border-riga align-top ${daEliminare === m.id ? 'bg-[#fff5f5]' : ''}`}>
                   <td className="whitespace-nowrap px-5 py-3 text-muto">{dataBreve(m.data)}</td>
                   <td className="px-3 py-3 font-semibold">{ETICHETTA_TIPO[m.tipo]}</td>
                   <td className={`px-3 py-3 text-right font-bold ${m.delta > 0 ? 'text-[#14632f]' : m.delta < 0 ? 'text-[#a31b1b]' : 'text-muto'}`}>
@@ -330,7 +345,41 @@ function Registro({ id }: { id: string }) {
                     {m.motivo}
                   </td>
                   <td className="px-5 py-3 text-muto">{m.autore}</td>
+                  {posso && (
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        aria-label="Elimina questa riga"
+                        title="Elimina riga"
+                        onClick={() => setDaEliminare(daEliminare === m.id ? null : m.id)}
+                        className="flex size-10 items-center justify-center rounded-lg text-muto hover:bg-[#fff5f5] hover:text-[#a31b1b]"
+                      >
+                        <Icona nome="cestino" dimensione={17} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
+                {daEliminare === m.id && (
+                  <tr className="bg-[#fff5f5]">
+                    <td colSpan={7} className="px-5 pb-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="mr-2 text-[13px] text-[#8a2a2a]">Eliminare questa riga dal registro?</span>
+                        {m.delta !== 0 && (
+                          <button type="button" className="btn-pericolo min-h-9 px-3 text-[13px]" disabled={elimina.isPending} onClick={() => elimina.mutate({ mid: m.id, ripristina: true })}>
+                            Elimina e ripristina il saldo ({m.delta > 0 ? `−${m.delta}` : `+${-m.delta}`})
+                          </button>
+                        )}
+                        <button type="button" className="btn-pericolo min-h-9 px-3 text-[13px]" disabled={elimina.isPending} onClick={() => elimina.mutate({ mid: m.id, ripristina: false })}>
+                          Elimina solo la riga
+                        </button>
+                        <button type="button" className="btn-secondario min-h-9 px-3 text-[13px]" onClick={() => setDaEliminare(null)}>
+                          Annulla
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -415,7 +464,7 @@ export function SchedaAzienda() {
           </Riquadro>
         </div>
       </div>
-      <Registro id={a.id} />
+      <Registro id={a.id} posso={posso} />
     </div>
   );
 }

@@ -31,7 +31,7 @@ Web app di ticketing per l'assistenza tecnica Wish. Tre aziende clienti (MODO SP
 - Spunta "Fuori contratto" nel ticket (solo super admin): restituisce la chiamata; togliendola la riscala. Eliminare un ticket a contratto restituisce la chiamata.
 - Rettifiche manuali con motivo (es. chiamata abbonata), rinnovo annuale, sblocco di emergenza per N richieste fuori contratto.
 - A chiamate finite il cliente non può aprire ticket (lo vede in app) e l'admin riceve una email.
-- Registro chiamate per azienda: ogni movimento con data, autore, ticket e saldo. Non modificabile.
+- Registro chiamate per azienda: ogni movimento con data, autore, ticket e saldo. Il super admin può eliminare una riga, scegliendo se ripristinare anche il saldo; la riga eliminata resta nel registro interno delle attività.
 
 **Prossime fasi**: messaggi e allegati nei ticket (2), notifiche push/SSE e comunicazioni (4), report, apparati e collegamento con il calendario interventi (5).
 

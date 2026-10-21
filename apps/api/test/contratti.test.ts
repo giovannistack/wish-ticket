@@ -168,4 +168,51 @@ describe('contratto e chiamate', () => {
     expect(testi).toContain('Segnato fuori contratto');
     expect(testi).toContain('Riportato a contratto');
   });
+
+  it('il super admin elimina una rettifica e ripristina il saldo', async () => {
+    await admin('POST', `/aziende/${modo}/rettifica`, { delta: -2, motivo: 'Errore di battitura' });
+    const prima = (await contratto()).residue;
+    const m = (await admin('GET', `/aziende/${modo}/movimenti`)).json()[0];
+    expect(m.motivo).toBe('Errore di battitura');
+    const r = await admin('DELETE', `/aziende/${modo}/movimenti/${m.id}?ripristina=1`);
+    expect(r.statusCode).toBe(200);
+    expect((await contratto()).residue).toBe(prima + 2);
+    const dopo = (await admin('GET', `/aziende/${modo}/movimenti`)).json() as Array<{ id: string }>;
+    expect(dopo.some((x) => x.id === m.id)).toBe(false);
+  });
+
+  it('eliminare solo la riga lascia il saldo com\'è', async () => {
+    await admin('POST', `/aziende/${modo}/rettifica`, { delta: 1, motivo: 'Da togliere dal registro' });
+    const prima = (await contratto()).residue;
+    const m = (await admin('GET', `/aziende/${modo}/movimenti`)).json()[0];
+    await admin('DELETE', `/aziende/${modo}/movimenti/${m.id}`);
+    expect((await contratto()).residue).toBe(prima);
+  });
+
+  it('annullare la scalata di un ticket restituisce la chiamata e il ticket non conta più', async () => {
+    const t = await apri('Da annullare');
+    const prima = (await contratto()).residue;
+    const m = ((await admin('GET', `/aziende/${modo}/movimenti`)).json() as Array<{ id: string; tipo: string; ticket: { id: string } | null }>).find(
+      (x) => x.tipo === 'scalata' && x.ticket?.id === t.json().id,
+    )!;
+    await admin('DELETE', `/aziende/${modo}/movimenti/${m.id}?ripristina=1`);
+    expect((await contratto()).residue).toBe(prima + 1);
+    const dett = (await admin('GET', `/ticket/${t.json().id}`)).json();
+    expect(dett.chiamataScalata).toBe(false);
+    // segnarlo poi fuori contratto non restituisce una seconda volta
+    await admin('PATCH', `/ticket/${t.json().id}`, { fuoriContratto: true });
+    expect((await contratto()).residue).toBe(prima + 1);
+  });
+
+  it('solo il super admin elimina righe del registro', async () => {
+    const m = (await admin('GET', `/aziende/${modo}/movimenti`)).json()[0];
+    const r = await admin('DELETE', `/aziende/${modo}/movimenti/${m.id}?ripristina=1`, undefined, tec);
+    expect(r.statusCode).toBe(403);
+  });
+
+  it('non si eliminano righe di un\'altra azienda passando dall\'URL sbagliato', async () => {
+    const m = (await admin('GET', `/aziende/${modo}/movimenti`)).json()[0];
+    const r = await admin('DELETE', `/aziende/${rgr}/movimenti/${m.id}`);
+    expect(r.statusCode).toBe(404);
+  });
 });
