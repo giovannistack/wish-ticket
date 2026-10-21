@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CATEGORIE,
   CATEGORIA_LABEL,
@@ -12,6 +12,7 @@ import {
   TIPO_APPARATO_LABEL,
   nuovoTicketSchema,
   type Categoria,
+  type ContrattoDTO,
   type Priorita,
   type TicketDTO,
 } from '@wish/shared';
@@ -28,6 +29,8 @@ export default function NuovoTicket() {
   const [categoria, setCategoria] = useState<Categoria | ''>('');
   const [priorita, setPriorita] = useState<Priorita>('media');
   const [invio, setInvio] = useState(false);
+  const contratto = useQuery({ queryKey: ['contratto'], queryFn: () => api<ContrattoDTO>('/ticket/contratto') });
+  const c = contratto.data;
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -37,6 +40,7 @@ export default function NuovoTicket() {
     try {
       const t = await api<TicketDTO>('/ticket', { method: 'POST', body: dati });
       await qc.invalidateQueries({ queryKey: ['ticket'] });
+      await qc.invalidateQueries({ queryKey: ['contratto'] });
       navigate(`/ticket/${t.id}`, { state: { creato: true } });
     } catch (err) {
       daErrore(err);
@@ -59,6 +63,16 @@ export default function NuovoTicket() {
       </div>
 
       <form onSubmit={onSubmit} onInput={pulisci} noValidate className="mx-auto -mt-12 flex max-w-2xl flex-col gap-3.5 px-4 pb-10">
+        {c?.bloccato && (
+          <Avviso>Le chiamate incluse nel contratto sono esaurite: per ora non puoi aprire nuovi ticket. Contatta Wish.</Avviso>
+        )}
+        {c?.attivo && !c.bloccato && (
+          <Avviso tipo="info">
+            {c.residue > 0
+              ? `Questa richiesta userà 1 delle ${c.residue} chiamate rimaste nel contratto.`
+              : 'Chiamate esaurite: questa è una richiesta urgente concessa da Wish, fuori contratto.'}
+          </Avviso>
+        )}
         {generale && <Avviso>{generale}</Avviso>}
 
         <Sezione numero={1} titolo="Richiedente">
@@ -151,7 +165,7 @@ export default function NuovoTicket() {
           </Selezione>
         </Sezione>
 
-        <button type="submit" className="btn-primario h-14 rounded-2xl text-base" disabled={invio}>
+        <button type="submit" className="btn-primario h-14 rounded-2xl text-base" disabled={invio || !!c?.bloccato}>
           {invio ? 'Invio in corso…' : 'Invia ticket'}
           <Icona nome="freccia" dimensione={20} spessore={2.2} />
         </button>

@@ -25,6 +25,14 @@ Web app di ticketing per l'assistenza tecnica Wish. Tre aziende clienti (MODO SP
 - Quando assegni un ticket a un collega, lui riceve una email con i dettagli, in copia a `EMAIL_AVVISI_ADMIN` (es. assistenza@wishsrl.it).
 - Eliminazione dei ticket (dalla dashboard o dal dettaglio) e degli utenti, anche attivi: i ticket di un utente eliminato restano, con il richiedente "Utente eliminato".
 
+**Aziende e contratti** (pagina Aziende)
+- Il super admin crea e modifica le aziende clienti; una nuova azienda compare subito nella registrazione.
+- Contratto annuale per azienda: chiamate incluse e periodo. Ogni ticket aperto dal cliente scala una chiamata in automatico.
+- Spunta "Fuori contratto" nel ticket (solo super admin): restituisce la chiamata; togliendola la riscala. Eliminare un ticket a contratto restituisce la chiamata.
+- Rettifiche manuali con motivo (es. chiamata abbonata), rinnovo annuale, sblocco di emergenza per N richieste fuori contratto.
+- A chiamate finite il cliente non può aprire ticket (lo vede in app) e l'admin riceve una email.
+- Registro chiamate per azienda: ogni movimento con data, autore, ticket e saldo. Non modificabile.
+
 **Prossime fasi**: messaggi e allegati nei ticket (2), notifiche push/SSE e comunicazioni (4), report, apparati e collegamento con il calendario interventi (5).
 
 ## Struttura

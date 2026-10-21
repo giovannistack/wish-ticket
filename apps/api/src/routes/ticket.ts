@@ -8,6 +8,7 @@ import { valida } from '../lib/valida.js';
 import { nonTrovato } from '../lib/errori.js';
 import { ticketDTO } from '../lib/dto.js';
 import { popolaTicket, storicoDi } from '../lib/ticket.js';
+import { annullaPrenotazione, contrattoDTO, prenotaChiamata, registra } from '../lib/contratto.js';
 
 const filtriSchema = z.object({
   stato: z.enum(STATI_TICKET).optional(),
@@ -35,6 +36,12 @@ const routes: FastifyPluginAsync = async (app) => {
     return ticketDTO(t);
   });
 
+  /** Stato del contratto della propria azienda: chiamate rimaste, blocco. */
+  app.get('/contratto', async (req) => {
+    const az = await AziendaModel.findById(scoped(req).aziendaId, { contratto: 1 }).lean();
+    return contrattoDTO(az?.contratto);
+  });
+
   /** Storico visibile al cliente: apertura, cambi di stato, assegnazione. Niente note interne. */
   app.get<{ Params: { id: string } }>('/:id/storico', async (req) => {
     if (!Types.ObjectId.isValid(req.params.id)) throw nonTrovato('Ticket');
@@ -46,19 +53,58 @@ const routes: FastifyPluginAsync = async (app) => {
   app.post('/', { config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, reply) => {
     const dati = valida(nuovoTicketSchema, req.body);
     const { aziendaId } = scoped(req); // mai dal body
+
+    // Contratto: scala una chiamata (o usa uno sblocco di emergenza) prima di creare il ticket
+    const esito = await prenotaChiamata(aziendaId);
+    const contratto = {
+      chiamataScalata: esito.tipo === 'scalata',
+      fuoriContratto: esito.tipo !== 'scalata',
+    };
+
     // Il numero è unico (indice): in caso di collisione si prende il successivo.
     let ticket;
-    for (let tentativo = 0; ; tentativo++) {
-      const numero = await prossimoNumeroTicket();
-      try {
-        ticket = await TicketModel.create({ ...dati, numero, aziendaId, richiedenteId: req.utente.id });
-        break;
-      } catch (err) {
-        if ((err as { code?: number }).code !== 11000 || tentativo >= 9) throw err;
+    try {
+      for (let tentativo = 0; ; tentativo++) {
+        const numero = await prossimoNumeroTicket();
+        try {
+          ticket = await TicketModel.create({ ...dati, ...contratto, numero, aziendaId, richiedenteId: req.utente.id });
+          break;
+        } catch (err) {
+          if ((err as { code?: number }).code !== 11000 || tentativo >= 9) throw err;
+        }
       }
+    } catch (err) {
+      await annullaPrenotazione(aziendaId, esito);
+      throw err;
     }
     const numero = ticket.numero;
     await StoricoModel.create({ ticketId: ticket._id, aziendaId, autoreId: req.utente.id, azione: 'creato', dettagli: { testo: 'Ticket aperto' } });
+    if (esito.tipo === 'scalata') {
+      await registra({ aziendaId, tipo: 'scalata', delta: -1, saldoDopo: esito.saldo, motivo: 'Apertura ticket', autoreId: req.utente.id, ticket });
+      if (esito.saldo === 0) {
+        const az = await AziendaModel.findById(aziendaId, { nome: 1 }).lean();
+        await app.mailer.invia({
+          a: app.cfg.emailAvvisiAdmin,
+          oggetto: `${az?.nome}: chiamate del contratto esaurite`,
+          titolo: 'Chiamate esaurite',
+          paragrafi: [
+            `Con il ticket ${ticket.numero}, ${az?.nome} ha usato l'ultima chiamata inclusa nel contratto.`,
+            'Da ora non può aprire nuovi ticket finché non rinnovi il contratto, aggiungi chiamate o concedi uno sblocco di emergenza.',
+          ],
+          bottone: { testo: 'Apri le aziende', url: `${app.cfg.urlPubblico}/admin/aziende` },
+        });
+      }
+    } else if (esito.tipo === 'sblocco') {
+      await registra({
+        aziendaId,
+        tipo: 'sblocco_usato',
+        delta: 0,
+        saldoDopo: esito.saldo,
+        motivo: `Richiesta di emergenza a chiamate esaurite (sblocchi rimasti: ${esito.sblocchiRimasti})`,
+        autoreId: req.utente.id,
+        ticket,
+      });
+    }
 
     const [azienda, richiedente] = await Promise.all([
       AziendaModel.findById(aziendaId, { nome: 1 }).lean(),

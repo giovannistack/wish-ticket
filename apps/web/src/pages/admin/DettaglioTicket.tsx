@@ -9,6 +9,7 @@ import {
   STATI_TICKET,
   STATO_TICKET_LABEL,
   type AggiornaTicketInput,
+  type AziendaConStatsDTO,
   type Modalita,
   type Priorita,
   type StatoTicket,
@@ -23,6 +24,7 @@ import { BoxSoluzione, SchedaTicket } from '../cliente/DettaglioTicket';
 
 interface Bozza {
   id: string;
+  fuoriContratto: boolean;
   stato: StatoTicket;
   priorita: Priorita;
   tecnicoId: string;
@@ -34,6 +36,7 @@ interface Bozza {
 
 const daTicket = (t: TicketAdminDTO): Bozza => ({
   id: t.id,
+  fuoriContratto: t.fuoriContratto,
   stato: t.stato,
   priorita: t.priorita,
   tecnicoId: t.tecnico?.id ?? '',
@@ -47,6 +50,7 @@ const daTicket = (t: TicketAdminDTO): Bozza => ({
 function differenze(t: TicketAdminDTO, b: Bozza): AggiornaTicketInput {
   const d: AggiornaTicketInput = {};
   const tempo = b.ore * 60 + b.minuti;
+  if (b.fuoriContratto !== t.fuoriContratto) d.fuoriContratto = b.fuoriContratto;
   if (b.stato !== t.stato) d.stato = b.stato;
   if (b.priorita !== t.priorita) d.priorita = b.priorita;
   if (b.tecnicoId !== (t.tecnico?.id ?? '')) d.tecnicoId = b.tecnicoId || null;
@@ -64,6 +68,7 @@ export default function DettaglioTicketAdmin() {
   const qc = useQueryClient();
   const chiave = ['admin', 'ticket', id];
   const q = useQuery({ queryKey: chiave, queryFn: () => api<TicketAdminDTO>(`/admin/ticket/${id}`) });
+  const aziende = useQuery({ queryKey: ['admin', 'aziende'], queryFn: () => api<AziendaConStatsDTO[]>('/admin/aziende') });
   const tecnici = useQuery({ queryKey: ['admin', 'tecnici'], queryFn: () => api<TecnicoDTO[]>('/admin/tecnici'), staleTime: 300_000 });
   const [bozza, setBozza] = useState<Bozza | null>(null);
   const [nota, setNota] = useState('');
@@ -110,6 +115,7 @@ export default function DettaglioTicketAdmin() {
   if (q.isError || !q.data || !bozza) return <Avviso>Ticket non trovato.</Avviso>;
 
   const t = q.data;
+  const azienda = aziende.data?.find((a) => a.id === t.azienda.id);
   const modifiche = differenze(t, bozza);
   const daSalvare = Object.keys(modifiche).length > 0;
   const set = <K extends keyof Bozza>(k: K, v: Bozza[K]) => setBozza({ ...bozza, [k]: v });
@@ -219,6 +225,24 @@ export default function DettaglioTicketAdmin() {
                 ))}
               </select>
             </label>
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-xl bg-fondo p-3">
+            <label className={`flex min-h-10 items-center gap-3 text-sm font-semibold ${utente?.superAdmin ? '' : 'opacity-70'}`}>
+              <input
+                type="checkbox"
+                checked={bozza.fuoriContratto}
+                disabled={!utente?.superAdmin}
+                onChange={(e) => set('fuoriContratto', e.target.checked)}
+                className="size-5 accent-[#c2410c]"
+              />
+              Fuori contratto
+            </label>
+            <span className="text-xs leading-relaxed text-muto">
+              {t.chiamataScalata ? 'Questo ticket ha usato una chiamata del contratto.' : 'Questo ticket non ha usato chiamate del contratto.'}
+              {azienda?.contratto.attivo ? ` ${t.azienda.nome}: ${azienda.contratto.residue} di ${azienda.contratto.chiamateAnnue} chiamate rimaste.` : ` ${t.azienda.nome} non ha un contratto attivo.`}
+              {!utente?.superAdmin && ' Solo il super admin può cambiarlo.'}
+            </span>
           </div>
 
           <fieldset className="flex flex-col gap-1.5">

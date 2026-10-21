@@ -190,6 +190,13 @@ const PERCORSI: Record<string, ReactNode> = {
       <path d="M9 12l2 2 4-4" />
     </>
   ),
+  azienda: (
+    <>
+      <path d="M3 21h18" />
+      <path d="M5 21V7l7-4 7 4v14" />
+      <path d="M9 21v-6h6v6" />
+    </>
+  ),
   posta: (
     <>
       <rect x="3" y="5" width="18" height="14" rx="2" />

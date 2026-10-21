@@ -14,7 +14,7 @@ import { NotaModel, StoricoModel, TicketModel } from '../models/index.js';
 import { ticketDTO } from './dto.js';
 
 /** Eventi dello storico che anche il cliente può vedere. */
-export const AZIONI_PUBBLICHE = ['creato', 'stato', 'assegnato'];
+export const AZIONI_PUBBLICHE = ['creato', 'stato', 'assegnato', 'contratto'];
 
 const nomeDi = (u: unknown) => {
   const p = u as { nome?: string; cognome?: string } | null;

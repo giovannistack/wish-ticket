@@ -50,6 +50,9 @@ export default function LayoutAdmin() {
           <VoceMenu to="/admin/utenti" icona="utenti" badge={inAttesa.data?.length}>
             Utenti e accessi
           </VoceMenu>
+          <VoceMenu to="/admin/aziende" icona="azienda">
+            Aziende
+          </VoceMenu>
           <VoceMenu to="/admin/team" icona="team">
             Team Wish
           </VoceMenu>

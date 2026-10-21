@@ -153,8 +153,39 @@ export const nuovaAziendaSchema = z.object({
   sede: z.string().trim().max(160).optional().default(''),
 });
 
+const dataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data non valida (AAAA-MM-GG)');
+
+export const contrattoSchema = z
+  .object({
+    attivo: z.boolean(),
+    chiamateAnnue: z.number().int('Numero intero').min(1, 'Almeno 1 chiamata').max(1000),
+    inizio: dataIso,
+    fine: dataIso,
+  })
+  .refine((d) => d.fine > d.inizio, { message: 'La fine deve essere dopo l\'inizio', path: ['fine'] });
+export type ContrattoInput = z.input<typeof contrattoSchema>;
+
+export const rettificaSchema = z.object({
+  delta: z
+    .number()
+    .int('Numero intero')
+    .min(-100)
+    .max(100)
+    .refine((n) => n !== 0, 'Indica quante chiamate aggiungere o togliere'),
+  motivo: testo(3, 300, 'Motivo'),
+});
+export type RettificaInput = z.input<typeof rettificaSchema>;
+
+export const sbloccoSchema = z.object({
+  richieste: z.number().int().min(0, 'Minimo 0').max(20, 'Massimo 20'),
+  motivo: z.string().trim().max(300).optional().default(''),
+});
+
+export const rinnovoSchema = z.object({ inizio: dataIso.optional() });
+
 export const aggiornaTicketSchema = z
   .object({
+    fuoriContratto: z.boolean().optional(),
     stato: z.enum(STATI_TICKET).optional(),
     priorita: z.enum(PRIORITA).optional(),
     tecnicoId: objectIdSchema.nullable().optional(),
@@ -203,12 +234,42 @@ export interface UtenteDTO {
   createdAt: string;
 }
 
+export interface ContrattoDTO {
+  attivo: boolean;
+  chiamateAnnue: number;
+  /** Chiamate ancora disponibili nel periodo. */
+  residue: number;
+  inizio: string | null;
+  fine: string | null;
+  /** Richieste di emergenza concesse dal super admin a chiamate esaurite. */
+  sblocchi: number;
+  /** Il cliente non può aprire ticket: contratto attivo, chiamate finite, nessuno sblocco. */
+  bloccato: boolean;
+  scaduto: boolean;
+}
+
 export interface AziendaDTO {
   id: string;
   nome: string;
   ragioneSociale: string;
   sede: string;
   attiva: boolean;
+  contratto: ContrattoDTO;
+}
+
+export const TIPI_MOVIMENTO = ['scalata', 'restituita', 'rettifica', 'rinnovo', 'impostazione', 'sblocco', 'sblocco_usato'] as const;
+export type TipoMovimento = (typeof TIPI_MOVIMENTO)[number];
+
+/** Una riga del registro chiamate di un'azienda. */
+export interface MovimentoDTO {
+  id: string;
+  tipo: TipoMovimento;
+  delta: number;
+  saldoDopo: number;
+  motivo: string;
+  ticket: { id: string; numero: string } | null;
+  autore: string;
+  data: string;
 }
 
 export interface AziendaConStatsDTO extends AziendaDTO {
@@ -234,6 +295,10 @@ export interface TicketDTO {
   tecnico: { id: string; nome: string } | null;
   modalita: Modalita | null;
   soluzione: string;
+  /** Intervento non coperto dal contratto (da fatturare a parte). */
+  fuoriContratto: boolean;
+  /** Il ticket ha consumato una chiamata del contratto. */
+  chiamataScalata: boolean;
   chiusoIl: string | null;
   createdAt: string;
   updatedAt: string;

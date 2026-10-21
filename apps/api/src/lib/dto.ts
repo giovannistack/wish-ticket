@@ -1,5 +1,6 @@
 import type { AziendaDTO, TicketDTO, UtenteDTO } from '@wish/shared';
 import type { Types } from 'mongoose';
+import { contrattoDTO } from './contratto.js';
 
 type Ref = { _id: Types.ObjectId; nome?: string; cognome?: string } | Types.ObjectId | null | undefined;
 
@@ -40,6 +41,7 @@ export function aziendaDTO(a: any): AziendaDTO {
     ragioneSociale: a.ragioneSociale ?? '',
     sede: a.sede ?? '',
     attiva: !!a.attiva,
+    contratto: contrattoDTO(a.contratto),
   };
 }
 
@@ -63,6 +65,8 @@ export function ticketDTO(t: any): TicketDTO {
     tecnico: t.tecnicoId && t.tecnicoId._id ? riferimento(t.tecnicoId, nomePersona) : null,
     modalita: t.modalita ?? null,
     soluzione: t.soluzione ?? '',
+    fuoriContratto: !!t.fuoriContratto,
+    chiamataScalata: !!t.chiamataScalata,
     chiusoIl: t.chiusoIl ? new Date(t.chiusoIl).toISOString() : null,
     createdAt: new Date(t.createdAt).toISOString(),
     updatedAt: new Date(t.updatedAt).toISOString(),

@@ -15,9 +15,10 @@ import {
 } from '@wish/shared';
 import { NotaModel, StoricoModel, TicketModel, UtenteModel } from '../../models/index.js';
 import { valida } from '../../lib/valida.js';
-import { ErroreApi, nonTrovato } from '../../lib/errori.js';
+import { ErroreApi, nonTrovato, vietato } from '../../lib/errori.js';
 import { ticketDTO } from '../../lib/dto.js';
 import { popolaTicket, testoEvento, ticketAdmin } from '../../lib/ticket.js';
+import { restituisci, scala } from '../../lib/contratto.js';
 
 const filtriSchema = z.object({
   aziendaId: objectIdSchema.optional(),
@@ -64,6 +65,11 @@ const routes: FastifyPluginAsync = async (app) => {
     const t = await TicketModel.findById(req.params.id);
     if (!t) throw nonTrovato('Ticket');
 
+    // Tutti i controlli prima di qualunque modifica (il contratto tocca anche l'azienda)
+    if (dati.stato && dati.stato !== t.stato && CHIUSI.includes(dati.stato) && !(dati.soluzione ?? t.soluzione).trim()) {
+      throw new ErroreApi(400, 'Scrivi la soluzione prima di chiudere il ticket: il cliente la riceve via email', 'SOLUZIONE_MANCANTE');
+    }
+
     const eventi: Array<{ azione: string; testo: string }> = [];
     let nuovoTecnico: { email: string; nome: string } | null = null;
     const statoPrima = t.stato as StatoTicket;
@@ -94,6 +100,24 @@ const routes: FastifyPluginAsync = async (app) => {
       t.tempoMinuti = dati.tempoMinuti;
       eventi.push({ azione: 'tempo', testo: testoEvento.tempo(dati.tempoMinuti) });
     }
+    // Contratto: solo il super admin decide se un intervento è fuori contratto
+    if (dati.fuoriContratto !== undefined && dati.fuoriContratto !== t.fuoriContratto) {
+      if (!req.utente.superAdmin) throw vietato('Solo il super admin può cambiare la copertura del contratto');
+      const rif = { _id: t._id, numero: t.numero };
+      if (dati.fuoriContratto) {
+        if (t.chiamataScalata) {
+          await restituisci(t.aziendaId, rif, req.utente.id, 'Ticket segnato fuori contratto');
+          t.chiamataScalata = false;
+        }
+        t.fuoriContratto = true;
+        eventi.push({ azione: 'contratto', testo: 'Segnato fuori contratto' });
+      } else {
+        await scala(t.aziendaId, rif, req.utente.id, 'Ticket riportato a contratto');
+        t.chiamataScalata = true;
+        t.fuoriContratto = false;
+        eventi.push({ azione: 'contratto', testo: 'Riportato a contratto' });
+      }
+    }
     if (dati.soluzione !== undefined && dati.soluzione !== t.soluzione) {
       t.soluzione = dati.soluzione;
       eventi.push({ azione: 'soluzione', testo: testoEvento.soluzione() });
@@ -121,8 +145,9 @@ const routes: FastifyPluginAsync = async (app) => {
   /** Elimina definitivamente un ticket con note e storico. Resta una riga nel registro generale. */
   app.delete<{ Params: { id: string } }>('/:id', { preHandler: app.soloSuperAdmin }, async (req) => {
     if (!Types.ObjectId.isValid(req.params.id)) throw nonTrovato('Ticket');
-    const t = await TicketModel.findById(req.params.id, { numero: 1, oggetto: 1, aziendaId: 1 }).lean();
+    const t = await TicketModel.findById(req.params.id, { numero: 1, oggetto: 1, aziendaId: 1, chiamataScalata: 1 }).lean();
     if (!t) throw nonTrovato('Ticket');
+    if (t.chiamataScalata) await restituisci(t.aziendaId, { _id: t._id, numero: t.numero }, req.utente.id, 'Ticket eliminato');
     await Promise.all([NotaModel.deleteMany({ ticketId: t._id }), StoricoModel.deleteMany({ ticketId: t._id })]);
     await TicketModel.deleteOne({ _id: t._id });
     await StoricoModel.create({

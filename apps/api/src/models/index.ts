@@ -3,6 +3,7 @@ import {
   CATEGORIE,
   DISPONIBILITA,
   MODALITA,
+  TIPI_MOVIMENTO,
   PRIORITA,
   RUOLI,
   STATI_TICKET,
@@ -19,6 +20,15 @@ const aziendaSchema = new Schema(
     ragioneSociale: { type: String, default: '' },
     sede: { type: String, default: '' },
     attiva: { type: Boolean, default: true },
+    // Contratto annuale di assistenza: numero di chiamate incluse nel periodo
+    contratto: {
+      attivo: { type: Boolean, default: false },
+      chiamateAnnue: { type: Number, default: 0 },
+      residue: { type: Number, default: 0 },
+      inizio: { type: Date, default: null },
+      fine: { type: Date, default: null },
+      sblocchi: { type: Number, default: 0 },
+    },
   },
   { timestamps: true },
 );
@@ -99,6 +109,8 @@ const ticketSchema = new Schema(
     modalita: { type: String, enum: [...MODALITA, null], default: null },
     tempoMinuti: { type: Number, default: 0 },
     soluzione: { type: String, default: '' },
+    fuoriContratto: { type: Boolean, default: false },
+    chiamataScalata: { type: Boolean, default: false },
     chiusoIl: { type: Date, default: null },
   },
   { timestamps: true },
@@ -122,6 +134,23 @@ const notaSchema = new Schema(
 );
 notaSchema.index({ ticketId: 1, createdAt: 1 });
 export const NotaModel = mongoose.model('Nota', notaSchema, 'note');
+
+// ---------- Registro chiamate del contratto (ogni movimento, mai modificato) ----------
+const movimentoSchema = new Schema(
+  {
+    aziendaId: { type: ObjectId, ref: 'Azienda', required: true },
+    tipo: { type: String, enum: TIPI_MOVIMENTO, required: true },
+    delta: { type: Number, default: 0 },
+    saldoDopo: { type: Number, required: true },
+    motivo: { type: String, default: '' },
+    ticketId: { type: ObjectId, ref: 'Ticket', default: null },
+    ticketNumero: { type: String, default: '' },
+    autoreId: { type: ObjectId, ref: 'Utente', required: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+movimentoSchema.index({ aziendaId: 1, createdAt: -1 });
+export const MovimentoModel = mongoose.model('Movimento', movimentoSchema, 'movimentiContratto');
 
 // ---------- Storico modifiche ----------
 const storicoSchema = new Schema(

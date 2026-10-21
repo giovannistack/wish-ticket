@@ -175,7 +175,10 @@ export default function Dashboard() {
                     </td>
                     <td className="px-3 py-3.5 align-top">
                       <div className="font-semibold">{t.oggetto}</div>
-                      <div className="text-xs text-muto">{t.richiedente.nome}</div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muto">
+                        {t.richiedente.nome}
+                        {t.fuoriContratto && <span className="pill bg-[#fff1e6] px-2 py-0.5 text-[11px] text-[#8f3600]">Fuori contratto</span>}
+                      </div>
                     </td>
                     <td className="px-3 py-3.5 align-top"><PrioritaPill priorita={t.priorita} /></td>
                     <td className="px-3 py-3.5 align-top"><StatoPill stato={t.stato} /></td>
