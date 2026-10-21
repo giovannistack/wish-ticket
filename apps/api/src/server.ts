@@ -2,10 +2,20 @@ import { caricaEnv } from './config.js';
 caricaEnv();
 import { buildApp } from './app.js';
 import { connettiDb, chiudiDb } from './db.js';
-import { RefreshTokenModel } from './models/index.js';
+import { RefreshTokenModel, UtenteModel } from './models/index.js';
 
 const app = await buildApp();
 await connettiDb(app.cfg.mongoUri);
+
+// Installazioni esistenti: se non c'è un super admin, lo diventa il primo admin creato
+if (!(await UtenteModel.exists({ ruolo: 'admin', superAdmin: true }))) {
+  const primo = await UtenteModel.findOne({ ruolo: 'admin' }).sort({ createdAt: 1 });
+  if (primo) {
+    primo.superAdmin = true;
+    await primo.save();
+    app.log.info({ email: primo.email }, 'Super admin assegnato al primo admin');
+  }
+}
 
 // Pulizia dei refresh token scaduti, all'avvio e poi ogni 6 ore
 const pulisci = () =>

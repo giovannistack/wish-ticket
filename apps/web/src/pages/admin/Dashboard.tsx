@@ -157,7 +157,7 @@ export default function Dashboard() {
                   <th className="px-3 py-3 font-semibold">Stato</th>
                   <th className="px-3 py-3 font-semibold">Tecnico</th>
                   <th className="px-3 py-3 text-right font-semibold">Aperto</th>
-                  <th className="w-14 px-3 py-3"><span className="sr-only">Azioni</span></th>
+                  {utente?.superAdmin && <th className="w-14 px-3 py-3"><span className="sr-only">Azioni</span></th>}
                 </tr>
               </thead>
               <tbody>
@@ -181,7 +181,7 @@ export default function Dashboard() {
                     <td className="px-3 py-3.5 align-top"><StatoPill stato={t.stato} /></td>
                     <td className="px-3 py-3.5 align-top text-testo">{t.tecnico?.nome ?? <span className="text-muto">—</span>}</td>
                     <td className="whitespace-nowrap px-3 py-3.5 text-right align-top text-muto">{dataBreve(t.createdAt)}</td>
-                    <td className="px-3 py-2 text-right align-top">
+                    {utente?.superAdmin && <td className="px-3 py-2 text-right align-top">
                       <button
                         type="button"
                         aria-label={`Elimina ${t.numero}`}
@@ -195,7 +195,7 @@ export default function Dashboard() {
                       >
                         <Icona nome="cestino" dimensione={17} />
                       </button>
-                    </td>
+                    </td>}
                   </tr>
                 ))}
               </tbody>

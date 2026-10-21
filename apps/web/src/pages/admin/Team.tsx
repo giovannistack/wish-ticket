@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { nuovoTecnicoSchema, passwordSchema, type MembroTeamDTO } from '@wish/shared';
 import { api, ErroreHttp } from '../../api';
+import { useAuth } from '../../auth';
 import { leggiForm, useErroriForm } from '../../form';
 import { Avviso, Campo, Caricamento, dataBreve } from '../../components/ui';
 
@@ -82,7 +83,7 @@ function NuovoMembro() {
   );
 }
 
-function RigaMembro({ m }: { m: MembroTeamDTO }) {
+function RigaMembro({ m, posso }: { m: MembroTeamDTO; posso: boolean }) {
   const qc = useQueryClient();
   const [cambio, setCambio] = useState(false);
   const [nuova, setNuova] = useState('');
@@ -106,6 +107,7 @@ function RigaMembro({ m }: { m: MembroTeamDTO }) {
           <span className="font-bold">
             {m.nome} {m.cognome} {m.io && <span className="font-medium text-muto">(tu)</span>}
           </span>
+          {m.superAdmin && <span className="pill mt-1 w-fit bg-navy text-white">Super admin</span>}
           <span className="truncate text-[13px] text-muto">{m.email}</span>
         </div>
         <div className="flex flex-[1_1_200px] flex-wrap gap-x-5 gap-y-1 text-[13px] text-testo">
@@ -114,20 +116,22 @@ function RigaMembro({ m }: { m: MembroTeamDTO }) {
         </div>
         {m.stato !== 'attivo' && <span className="pill bg-[#f4f6fa] text-testo">Disattivato</span>}
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-secondario min-h-9 px-3 text-[13px]" onClick={() => setCambio(!cambio)}>
-            Cambia password
-          </button>
-          {!m.io && m.stato === 'attivo' && (
+          {(m.io || (posso && !m.superAdmin)) && (
+            <button type="button" className="btn-secondario min-h-9 px-3 text-[13px]" onClick={() => setCambio(!cambio)}>
+              {m.io ? 'Cambia la mia password' : 'Cambia password'}
+            </button>
+          )}
+          {posso && !m.io && !m.superAdmin && m.stato === 'attivo' && (
             <button type="button" className="btn-secondario min-h-9 px-3 text-[13px]" disabled={azione.isPending} onClick={() => azione.mutate({ metodo: 'POST', percorso: '/disattiva' })}>
               Disattiva
             </button>
           )}
-          {!m.io && m.stato !== 'attivo' && (
+          {posso && !m.io && !m.superAdmin && m.stato !== 'attivo' && (
             <button type="button" className="btn-secondario min-h-9 px-3 text-[13px]" disabled={azione.isPending} onClick={() => azione.mutate({ metodo: 'POST', percorso: '/riattiva' })}>
               Riattiva
             </button>
           )}
-          {!m.io && (
+          {posso && !m.io && !m.superAdmin && (
             <button
               type="button"
               className="btn-pericolo min-h-9 px-3 text-[13px]"
@@ -168,6 +172,8 @@ function RigaMembro({ m }: { m: MembroTeamDTO }) {
 }
 
 export default function Team() {
+  const { utente } = useAuth();
+  const posso = !!utente?.superAdmin;
   const team = useQuery({ queryKey: ['admin', 'team'], queryFn: () => api<MembroTeamDTO[]>('/admin/tecnici/team') });
   return (
     <div className="flex flex-col gap-5">
@@ -176,9 +182,13 @@ export default function Team() {
         <h1 className="text-[28px] font-extrabold tracking-tight">Team Wish</h1>
       </div>
       <section className="card overflow-hidden">
-        {team.isLoading ? <Caricamento /> : team.data?.map((m) => <RigaMembro key={m.id} m={m} />)}
+        {team.isLoading ? <Caricamento /> : team.data?.map((m) => <RigaMembro key={m.id} m={m} posso={posso} />)}
       </section>
-      <NuovoMembro />
+      {posso ? (
+        <NuovoMembro />
+      ) : (
+        <Avviso tipo="info">Gli account del team li gestisce il super admin. Tu puoi cambiare la tua password.</Avviso>
+      )}
     </div>
   );
 }

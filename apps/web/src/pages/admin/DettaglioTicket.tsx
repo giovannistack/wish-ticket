@@ -282,7 +282,7 @@ export default function DettaglioTicketAdmin() {
               Il cliente riceve una email quando cambia lo stato. Per segnare risolto serve la soluzione.
             </p>
           </div>
-          <div className="border-t border-riga pt-4">
+          {utente?.superAdmin && <div className="border-t border-riga pt-4">
             <button
               type="button"
               className="btn-pericolo w-full"
@@ -293,7 +293,7 @@ export default function DettaglioTicketAdmin() {
             >
               <Icona nome="cestino" dimensione={16} /> Elimina ticket
             </button>
-          </div>
+          </div>}
         </form>
       </div>
     </div>

@@ -119,7 +119,7 @@ const routes: FastifyPluginAsync = async (app) => {
   });
 
   /** Elimina definitivamente un ticket con note e storico. Resta una riga nel registro generale. */
-  app.delete<{ Params: { id: string } }>('/:id', async (req) => {
+  app.delete<{ Params: { id: string } }>('/:id', { preHandler: app.soloSuperAdmin }, async (req) => {
     if (!Types.ObjectId.isValid(req.params.id)) throw nonTrovato('Ticket');
     const t = await TicketModel.findById(req.params.id, { numero: 1, oggetto: 1, aziendaId: 1 }).lean();
     if (!t) throw nonTrovato('Ticket');

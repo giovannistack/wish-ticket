@@ -36,6 +36,8 @@ const utenteSchema = new Schema(
     ufficio: { type: String, default: '' },
     passwordHash: { type: String, required: true },
     ruolo: { type: String, enum: RUOLI, default: 'utente' },
+    // Un solo super admin: gestisce il team ed è l'unico che può eliminare i ticket
+    superAdmin: { type: Boolean, default: false },
     stato: { type: String, enum: STATI_UTENTE, default: 'in_attesa' },
     // null finché l'admin non conferma l'azienda; sempre null per gli admin
     aziendaId: { type: ObjectId, ref: 'Azienda', default: null },

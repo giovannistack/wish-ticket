@@ -40,6 +40,7 @@ export async function avviaApp() {
     email: 'admin@wishsrl.it',
     passwordHash: await bcrypt.hash(PASSWORD, 4),
     ruolo: 'admin',
+    superAdmin: true,
     stato: 'attivo',
     emailVerificata: true,
   });

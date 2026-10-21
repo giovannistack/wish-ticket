@@ -22,6 +22,7 @@ export function utenteDTO(u: any): UtenteDTO {
     telefono: u.telefono ?? '',
     ufficio: u.ufficio ?? '',
     ruolo: u.ruolo,
+    superAdmin: !!u.superAdmin,
     stato: u.stato,
     emailVerificata: !!u.emailVerificata,
     azienda: riferimento(u.aziendaId, nomeAzienda),

@@ -39,6 +39,8 @@ if (email && password) {
       email,
       passwordHash: await bcrypt.hash(password, cfg.bcryptCosto),
       ruolo: 'admin',
+      // Il primo admin creato è il super admin
+      superAdmin: !(await UtenteModel.exists({ ruolo: 'admin', superAdmin: true })),
       stato: 'attivo',
       emailVerificata: true,
     });

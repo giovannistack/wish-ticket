@@ -37,11 +37,16 @@ const routes: FastifyPluginAsync = async (app) => {
         ultimoAccesso: a.ultimoAccesso ? new Date(a.ultimoAccesso).toISOString() : null,
         ticketAperti: await TicketModel.countDocuments({ tecnicoId: a._id, stato: { $in: STATI_APERTI } }),
         io: String(a._id) === req.utente.id,
+        superAdmin: !!a.superAdmin,
       })),
     );
   });
 
-  app.post('/', async (req, reply) => {
+  // Creare, modificare e rimuovere account del team: solo il super admin.
+  // Ogni tecnico può comunque cambiare la propria password.
+  const superAdmin = { preHandler: app.soloSuperAdmin };
+
+  app.post('/', superAdmin, async (req, reply) => {
     const dati = valida(nuovoTecnicoSchema, req.body);
     if (await UtenteModel.exists({ email: dati.email })) {
       throw new ErroreApi(409, 'Questa email è già usata da un altro account', 'DUPLICATO');
@@ -76,11 +81,20 @@ const routes: FastifyPluginAsync = async (app) => {
     if (!u) throw nonTrovato('Account');
     return u;
   };
+  /** Il super admin non si disattiva né si elimina, da nessuno. */
+  const nonSuper = (u: { superAdmin?: boolean | null }) => {
+    if (u.superAdmin) throw vietato("L'account del super admin non si può disattivare né eliminare");
+  };
   const altriAdminAttivi = (id: Types.ObjectId) => UtenteModel.countDocuments({ ruolo: 'admin', stato: 'attivo', _id: { $ne: id } });
 
   app.patch<{ Params: { id: string } }>('/:id', async (req) => {
     const dati = valida(aggiornaTecnicoSchema, req.body);
     const u = await trova(req.params.id);
+    const proprio = String(u._id) === req.utente.id;
+    // Chi non è super admin può solo cambiare la propria password
+    if (!req.utente.superAdmin && (!proprio || dati.nome || dati.cognome)) {
+      throw vietato('Puoi cambiare solo la tua password');
+    }
     if (dati.nome) u.nome = dati.nome;
     if (dati.cognome) u.cognome = dati.cognome;
     if (dati.password) {
@@ -92,8 +106,9 @@ const routes: FastifyPluginAsync = async (app) => {
     return { ok: true };
   });
 
-  app.post<{ Params: { id: string } }>('/:id/disattiva', async (req) => {
+  app.post<{ Params: { id: string } }>('/:id/disattiva', superAdmin, async (req) => {
     const u = await trova(req.params.id);
+    nonSuper(u);
     if (String(u._id) === req.utente.id) throw vietato('Non puoi disattivare te stesso');
     u.stato = 'disattivato';
     await u.save();
@@ -101,7 +116,7 @@ const routes: FastifyPluginAsync = async (app) => {
     return { ok: true };
   });
 
-  app.post<{ Params: { id: string } }>('/:id/riattiva', async (req) => {
+  app.post<{ Params: { id: string } }>('/:id/riattiva', superAdmin, async (req) => {
     const u = await trova(req.params.id);
     u.stato = 'attivo';
     await u.save();
@@ -109,8 +124,9 @@ const routes: FastifyPluginAsync = async (app) => {
   });
 
   /** Elimina un account del team. I suoi ticket aperti tornano "non assegnati". */
-  app.delete<{ Params: { id: string } }>('/:id', async (req) => {
+  app.delete<{ Params: { id: string } }>('/:id', superAdmin, async (req) => {
     const u = await trova(req.params.id);
+    nonSuper(u);
     if (String(u._id) === req.utente.id) throw vietato('Non puoi eliminare te stesso');
     if ((await altriAdminAttivi(u._id)) === 0) throw new ErroreApi(409, 'Deve restare almeno un admin attivo', 'ULTIMO_ADMIN');
     const r = await TicketModel.updateMany({ tecnicoId: u._id, stato: { $in: STATI_APERTI } }, { $set: { tecnicoId: null } });

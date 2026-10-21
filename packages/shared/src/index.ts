@@ -193,6 +193,8 @@ export interface UtenteDTO {
   telefono: string;
   ufficio: string;
   ruolo: Ruolo;
+  /** L'admin principale: unico che gestisce il team ed elimina i ticket. */
+  superAdmin: boolean;
   stato: StatoUtente;
   emailVerificata: boolean;
   azienda: { id: string; nome: string } | null;
@@ -274,6 +276,7 @@ export interface MembroTeamDTO {
   ultimoAccesso: string | null;
   ticketAperti: number;
   io: boolean;
+  superAdmin: boolean;
 }
 
 export interface LoginResponse {

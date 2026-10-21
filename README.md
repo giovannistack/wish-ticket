@@ -20,7 +20,8 @@ Web app di ticketing per l'assistenza tecnica Wish. Tre aziende clienti (MODO SP
 - Note interne, mai visibili ai clienti. Storico completo di ogni modifica per l'admin; il cliente vede solo apertura, assegnazione e cambi di stato.
 - Dashboard: colonna tecnico e filtro "Assegnati a me".
 - Utenti e accessi: riquadro "Rifiutati e disattivati" con "Rimetti in attesa" ed "Elimina" (solo per chi non ha aperto ticket).
-- Pagina **Team Wish**: crei a mano gli altri admin/tecnici (nome, email, password), cambi la password, li disattivi o elimini. La password non viene mai mandata per email.
+- **Super admin**: il primo admin creato (in un'installazione esistente lo diventa da solo al primo avvio). È l'unico che crea, modifica, disattiva ed elimina gli account del team, e l'unico che può eliminare i ticket. Il suo account non lo può toccare nessun altro. Gli altri tecnici gestiscono ticket e clienti e possono cambiare solo la propria password.
+- Pagina **Team Wish**: il super admin crea a mano gli altri admin/tecnici (nome, email, password), cambi la password, li disattivi o elimini. La password non viene mai mandata per email.
 - Quando assegni un ticket a un collega, lui riceve una email con i dettagli, in copia a `EMAIL_AVVISI_ADMIN` (es. assistenza@wishsrl.it).
 - Eliminazione dei ticket (dalla dashboard o dal dettaglio) e degli utenti, anche attivi: i ticket di un utente eliminato restano, con il richiedente "Utente eliminato".
 

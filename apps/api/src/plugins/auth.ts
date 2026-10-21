@@ -9,6 +9,7 @@ import { nonAutorizzato, vietato } from '../lib/errori.js';
 export interface UtenteRichiesta {
   id: string;
   ruolo: Ruolo;
+  superAdmin: boolean;
   /** Azienda dell'utente. Sempre presente per referente e utente, null per admin. */
   aziendaId: Types.ObjectId | null;
 }
@@ -32,6 +33,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     autentica: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
     soloAdmin: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    soloSuperAdmin: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
     firmaAccesso: (utente: { id: string; ruolo: Ruolo }) => string;
   }
 }
@@ -58,12 +60,13 @@ export default fp(async (app) => {
       throw nonAutorizzato('Sessione scaduta, accedi di nuovo');
     }
     if (!Types.ObjectId.isValid(payload.sub)) throw nonAutorizzato();
-    const u = await UtenteModel.findById(payload.sub, { ruolo: 1, stato: 1, aziendaId: 1 }).lean();
+    const u = await UtenteModel.findById(payload.sub, { ruolo: 1, stato: 1, aziendaId: 1, superAdmin: 1 }).lean();
     if (!u || u.stato !== 'attivo') throw nonAutorizzato('Account non attivo');
     if (u.ruolo !== 'admin' && !u.aziendaId) throw nonAutorizzato('Account senza azienda');
     req.utente = {
       id: String(u._id),
       ruolo: u.ruolo as Ruolo,
+      superAdmin: u.ruolo === 'admin' && !!u.superAdmin,
       aziendaId: u.ruolo === 'admin' ? null : (u.aziendaId as Types.ObjectId),
     };
   });
@@ -71,6 +74,11 @@ export default fp(async (app) => {
   app.decorate('soloAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
     await app.autentica(req, reply);
     if (req.utente.ruolo !== 'admin') throw vietato();
+  });
+
+  app.decorate('soloSuperAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
+    await app.soloAdmin(req, reply);
+    if (!req.utente.superAdmin) throw vietato('Operazione riservata al super admin');
   });
 });
 
