@@ -161,6 +161,9 @@ const routes: FastifyPluginAsync = async (app) => {
     // Contratto: solo il super admin decide se un intervento è fuori contratto
     if (dati.fuoriContratto !== undefined && dati.fuoriContratto !== t.fuoriContratto) {
       if (!req.utente.superAdmin) throw vietato('Solo il super admin può cambiare la copertura del contratto');
+      if (!dati.fuoriContratto && (await AziendaModel.exists({ _id: t.aziendaId, tipo: 'privato' }))) {
+        throw new ErroreApi(400, 'I clienti privati non hanno un contratto: il ticket resta fuori contratto', 'PRIVATO');
+      }
       const rif = { _id: t._id, numero: t.numero };
       if (dati.fuoriContratto) {
         if (t.chiamataScalata) {

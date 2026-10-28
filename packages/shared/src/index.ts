@@ -72,7 +72,7 @@ export const MODALITA = ['remoto', 'onsite', 'laboratorio'] as const;
 export type Modalita = (typeof MODALITA)[number];
 export const MODALITA_LABEL: Record<Modalita, string> = {
   remoto: 'Da remoto',
-  onsite: 'On-site',
+  onsite: 'On-site (presso il cliente)',
   laboratorio: 'Presso il nostro laboratorio',
 };
 

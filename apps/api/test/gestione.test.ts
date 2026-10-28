@@ -57,7 +57,7 @@ describe('gestione ticket', () => {
     expect(t.tempoMinuti).toBe(90);
     expect(t.priorita).toBe('alta');
     const testi = (t.storico as Array<{ descrizione: string }>).map((e) => e.descrizione);
-    expect(testi).toContain('Intervento: on-site');
+    expect(testi).toContain('Intervento: on-site (presso il cliente)');
     expect(testi).toContain('Tempo registrato: 1 h 30 min');
     expect(testi).toContain('Priorità: Media → Alta');
   });

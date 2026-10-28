@@ -107,6 +107,12 @@ describe('attivazione e tipologie', () => {
     expect(await MovimentoModel.countDocuments({ aziendaId: privatoA.id })).toBe(0);
   });
 
+  it('il ticket di un privato non si può riportare a contratto', async () => {
+    const r = await ctx.app.inject({ method: 'PATCH', url: `/api/admin/ticket/${ticketA}`, headers: bearer(admin), payload: { fuoriContratto: false } });
+    expect(r.statusCode).toBe(400);
+    expect(r.json().codice).toBe('PRIVATO');
+  });
+
   it('due privati non vedono i ticket uno dell\'altro', async () => {
     const r = await ctx.app.inject({ method: 'GET', url: `/api/ticket/${ticketA}`, headers: bearer(privatoB.token) });
     expect(r.statusCode).toBe(404);

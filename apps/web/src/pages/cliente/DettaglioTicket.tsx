@@ -26,8 +26,9 @@ export function SchedaTicket({ t }: { t: TicketDTO }) {
     ['Aperto', dataBreve(t.createdAt)],
     ['Tecnico', t.tecnico?.nome || 'Non ancora assegnato'],
     ['Intervento', t.modalita ? MODALITA_LABEL[t.modalita] : '—'],
-    ['Copertura', t.fuoriContratto ? 'Fuori contratto' : 'A contratto (1 chiamata)'] as [string, string],
   ];
+  // Il contratto riguarda solo le aziende: a un privato non si mostra nulla
+  if (t.azienda.tipologia !== 'privato') righe.push(['Copertura', t.fuoriContratto ? 'Fuori contratto' : 'A contratto (1 chiamata)']);
   return (
     <article className="card flex flex-col gap-5 p-5">
       <div className="flex flex-col gap-2.5">
