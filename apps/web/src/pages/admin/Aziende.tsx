@@ -6,13 +6,16 @@ import {
   type AziendaConStatsDTO,
   type AziendaDTO,
   type MovimentoDTO,
+  type TipoCliente,
   type TipoMovimento,
+  type TipologiaCliente,
 } from '@wish/shared';
 import { api, ErroreHttp } from '../../api';
 import { useAuth } from '../../auth';
 import { leggiForm, useErroriForm } from '../../form';
 import { BarraChiamate, dataIt } from '../../components/Contratto';
-import { Avviso, Campo, Caricamento, Icona, dataBreve } from '../../components/ui';
+import { Avviso, Campo, Caricamento, Icona, Selezione, dataBreve } from '../../components/ui';
+import { FiltroTipologia, TipologiaPill } from '../../components/Cliente';
 
 const useAziende = () => useQuery({ queryKey: ['admin', 'aziende'], queryFn: () => api<AziendaConStatsDTO[]>('/admin/aziende') });
 const messaggio = (e: unknown) => (e instanceof ErroreHttp ? e.message : e ? 'Operazione non riuscita' : null);
@@ -22,6 +25,7 @@ const messaggio = (e: unknown) => (e instanceof ErroreHttp ? e.message : e ? 'Op
 function NuovaAzienda() {
   const qc = useQueryClient();
   const [aperto, setAperto] = useState(false);
+  const [tipo, setTipo] = useState<TipoCliente>('azienda');
   const { campi, generale, valida, daErrore, pulisci } = useErroriForm();
   const crea = useMutation({
     mutationFn: (dati: unknown) => api('/admin/aziende', { method: 'POST', body: dati }),
@@ -30,7 +34,7 @@ function NuovaAzienda() {
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const dati = valida(nuovaAziendaSchema, leggiForm(form));
+    const dati = valida(nuovaAziendaSchema, { ...leggiForm(form), tipo });
     if (!dati) return;
     try {
       await crea.mutateAsync(dati);
@@ -43,23 +47,35 @@ function NuovaAzienda() {
   if (!aperto) {
     return (
       <button type="button" className="btn-primario self-start" onClick={() => setAperto(true)}>
-        <Icona nome="piu" dimensione={18} /> Nuova azienda
+        <Icona nome="piu" dimensione={18} /> Nuovo cliente
       </button>
     );
   }
+  const privato = tipo === 'privato';
   return (
     <form onSubmit={onSubmit} onInput={pulisci} noValidate className="card flex flex-col gap-4 p-5">
-      <h2 className="text-base font-extrabold">Nuova azienda cliente</h2>
+      <h2 className="text-base font-extrabold">Nuovo cliente</h2>
       {generale && <Avviso>{generale}</Avviso>}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Campo etichetta="Nome" name="nome" placeholder="Come la vedono i clienti" errore={campi.nome} />
-        <Campo etichetta="Ragione sociale" name="ragioneSociale" errore={campi.ragioneSociale} />
-        <Campo etichetta="Sede" name="sede" errore={campi.sede} />
+      <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
+        <Selezione etichetta="Tipo" value={tipo} onChange={(e) => setTipo(e.target.value as TipoCliente)}>
+          <option value="azienda">Azienda</option>
+          <option value="privato">Cliente privato</option>
+        </Selezione>
+        <Campo etichetta={privato ? 'Nome e cognome' : 'Nome'} name="nome" placeholder={privato ? 'Es. Mario Rossi' : 'Come la vedono i clienti'} errore={campi.nome} />
       </div>
-      <p className="text-[13px] text-muto">Comparirà subito nel modulo di registrazione. Il contratto lo imposti dopo, dalla scheda dell'azienda.</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {!privato && <Campo etichetta="Ragione sociale" name="ragioneSociale" errore={campi.ragioneSociale} />}
+        {!privato && <Campo etichetta="Partita IVA" name="partitaIva" inputMode="numeric" placeholder="11 cifre" errore={campi.partitaIva} />}
+        <Campo etichetta={privato ? 'Indirizzo' : 'Sede'} name="sede" errore={campi.sede} />
+      </div>
+      <p className="text-[13px] text-muto">
+        {privato
+          ? 'Un cliente privato non compare mai nel modulo di registrazione: gli associ tu gli utenti quando li attivi.'
+          : "Comparirà subito nel modulo di registrazione. Il contratto lo imposti dopo, dalla scheda dell'azienda: finché non c'è, è un'azienda senza contratto."}
+      </p>
       <div className="flex gap-2 self-end">
         <button type="button" className="btn-secondario" onClick={() => setAperto(false)}>Annulla</button>
-        <button type="submit" className="btn-primario" disabled={crea.isPending}>Crea azienda</button>
+        <button type="submit" className="btn-primario" disabled={crea.isPending}>Crea cliente</button>
       </div>
     </form>
   );
@@ -68,31 +84,52 @@ function NuovaAzienda() {
 export default function Aziende() {
   const { utente } = useAuth();
   const aziende = useAziende();
+  const [tipologia, setTipologia] = useState<TipologiaCliente | ''>('');
+  const [cerca, setCerca] = useState('');
+  const q = cerca.trim().toLowerCase();
+  const elenco = (aziende.data ?? []).filter(
+    (a) => (!tipologia || a.tipologia === tipologia) && (!q || a.nome.toLowerCase().includes(q) || a.partitaIva.includes(q)),
+  );
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
-        <span className="text-[13px] font-medium text-muto">Clienti e contratti di assistenza</span>
-        <h1 className="text-[28px] font-extrabold tracking-tight">Aziende</h1>
+        <span className="text-[13px] font-medium text-muto">Aziende con e senza contratto, clienti privati</span>
+        <h1 className="text-[28px] font-extrabold tracking-tight">Clienti</h1>
       </div>
       {utente?.superAdmin && <NuovaAzienda />}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <FiltroTipologia valore={tipologia} onCambio={setTipologia} />
+        <label className="flex h-10 min-w-[220px] items-center gap-2 rounded-[10px] border border-bordo bg-white px-3 text-muto">
+          <Icona nome="cerca" dimensione={16} />
+          <span className="sr-only">Cerca cliente</span>
+          <input type="search" value={cerca} onChange={(e) => setCerca(e.target.value)} placeholder="Nome o partita IVA" className="min-w-0 flex-1 bg-transparent text-sm text-inchiostro outline-none" />
+        </label>
+        <span className="text-[13px] text-muto">{elenco.length} clienti</span>
+      </div>
       {aziende.isLoading && <Caricamento />}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-        {aziende.data?.map((a) => (
+        {elenco.map((a) => (
           <Link key={a.id} to={`/admin/aziende/${a.id}`} className={`card flex flex-col gap-4 p-5 transition hover:-translate-y-0.5 hover:shadow-lg ${a.attiva ? '' : 'opacity-60'}`}>
             <div className="flex items-center gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-navy text-sm font-extrabold text-white">
+              <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold text-white ${a.tipo === 'privato' ? 'rounded-full bg-[#5a37c4]' : 'bg-navy'}`}>
                 {a.nome.slice(0, 2).toUpperCase()}
               </span>
-              <div className="flex min-w-0 flex-col">
+              <div className="flex min-w-0 flex-col gap-1">
                 <span className="text-[15px] font-extrabold">{a.nome}</span>
-                <span className="text-xs text-muto">
-                  {a.attiva ? `${a.utentiAttivi} utenti · ${a.ticketAperti} ticket aperti` : 'Non attiva'}
+                <span className="flex flex-wrap items-center gap-1.5 text-xs text-muto">
+                  <TipologiaPill tipologia={a.tipologia} piccola />
+                  {a.attiva ? `${a.utentiAttivi} utenti · ${a.ticketAperti} ticket aperti` : 'Non attivo'}
                 </span>
               </div>
             </div>
-            <BarraChiamate c={a.contratto} compatta />
+            {a.tipologia === 'contratto' ? (
+              <BarraChiamate c={a.contratto} compatta />
+            ) : (
+              a.partitaIva && <span className="font-mono text-xs text-muto">P.IVA {a.partitaIva}</span>
+            )}
           </Link>
         ))}
+        {!aziende.isLoading && elenco.length === 0 && <p className="text-sm text-muto">Nessun cliente con questi filtri.</p>}
       </div>
     </div>
   );
@@ -472,10 +509,14 @@ function Registro({ id, posso }: { id: string; posso: boolean }) {
 }
 
 function Anagrafica({ a, posso, onFatto }: { a: AziendaDTO; posso: boolean; onFatto: (a: AziendaDTO) => void }) {
-  const [dati, setDati] = useState({ nome: a.nome, ragioneSociale: a.ragioneSociale, sede: a.sede, attiva: a.attiva });
-  useEffect(() => setDati({ nome: a.nome, ragioneSociale: a.ragioneSociale, sede: a.sede, attiva: a.attiva }), [a]);
-  const salva = useMutation({ mutationFn: () => api<AziendaDTO>(`/admin/aziende/${a.id}`, { method: 'PATCH', body: dati }), onSuccess: onFatto });
-  const cambiato = dati.nome !== a.nome || dati.ragioneSociale !== a.ragioneSociale || dati.sede !== a.sede || dati.attiva !== a.attiva;
+  const iniziali = () => ({ nome: a.nome, ragioneSociale: a.ragioneSociale, partitaIva: a.partitaIva, sede: a.sede, attiva: a.attiva });
+  const [dati, setDati] = useState(iniziali);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setDati(iniziali()), [a]);
+  const modifiche = Object.fromEntries(Object.entries(dati).filter(([k, v]) => v !== a[k as keyof typeof dati]));
+  const salva = useMutation({ mutationFn: () => api<AziendaDTO>(`/admin/aziende/${a.id}`, { method: 'PATCH', body: modifiche }), onSuccess: onFatto });
+  const cambiato = Object.keys(modifiche).length > 0;
+  const privato = a.tipo === 'privato';
   return (
     <form
       className="flex flex-col gap-3"
@@ -484,15 +525,17 @@ function Anagrafica({ a, posso, onFatto }: { a: AziendaDTO; posso: boolean; onFa
         salva.mutate();
       }}
     >
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Campo etichetta="Nome" value={dati.nome} disabled={!posso} onChange={(e) => setDati({ ...dati, nome: e.target.value })} />
-        <Campo etichetta="Ragione sociale" value={dati.ragioneSociale} disabled={!posso} onChange={(e) => setDati({ ...dati, ragioneSociale: e.target.value })} />
-        <Campo etichetta="Sede" value={dati.sede} disabled={!posso} onChange={(e) => setDati({ ...dati, sede: e.target.value })} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Campo etichetta={privato ? 'Nome e cognome' : 'Nome'} value={dati.nome} disabled={!posso} onChange={(e) => setDati({ ...dati, nome: e.target.value })} />
+        <Campo etichetta={privato ? 'Indirizzo' : 'Sede'} value={dati.sede} disabled={!posso} onChange={(e) => setDati({ ...dati, sede: e.target.value })} />
+        {!privato && <Campo etichetta="Ragione sociale" value={dati.ragioneSociale} disabled={!posso} onChange={(e) => setDati({ ...dati, ragioneSociale: e.target.value })} />}
+        {!privato && <Campo etichetta="Partita IVA" value={dati.partitaIva} inputMode="numeric" disabled={!posso} onChange={(e) => setDati({ ...dati, partitaIva: e.target.value })} />}
       </div>
       <label className="flex min-h-11 items-center gap-3 text-sm">
         <input type="checkbox" checked={dati.attiva} disabled={!posso} onChange={(e) => setDati({ ...dati, attiva: e.target.checked })} className="size-5 accent-brand" />
         <span>
-          <strong>Azienda attiva</strong> <span className="text-muto">· se la disattivi non compare più nella registrazione</span>
+          <strong>Cliente attivo</strong>{' '}
+          <span className="text-muto">{privato ? '· se lo disattivi non puoi più associargli utenti' : '· se lo disattivi non compare più nella registrazione'}</span>
         </span>
       </label>
       {messaggio(salva.error) && <Avviso>{messaggio(salva.error)}</Avviso>}
@@ -515,21 +558,33 @@ export function SchedaAzienda() {
   const aggiorna = () => qc.invalidateQueries({ queryKey: ['admin'] });
 
   if (aziende.isLoading) return <Caricamento />;
-  if (!a) return <Avviso>Azienda non trovata.</Avviso>;
+  if (!a) return <Avviso>Cliente non trovato.</Avviso>;
+  const privato = a.tipo === 'privato';
 
   return (
     <div className="flex flex-col gap-5">
       <Link to="/admin/aziende" className="flex w-fit items-center gap-1.5 rounded-lg text-sm font-semibold text-brand">
-        <Icona nome="indietro" dimensione={16} /> Tutte le aziende
+        <Icona nome="indietro" dimensione={16} /> Tutti i clienti
       </Link>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <span className="text-[13px] font-medium text-muto">{a.utentiAttivi} utenti · {a.ticketAperti} ticket aperti</span>
+          <span className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-muto">
+            <TipologiaPill tipologia={a.tipologia} breve={false} />
+            {a.utentiAttivi} utenti · {a.ticketAperti} ticket aperti
+            {a.partitaIva && <span className="font-mono">· P.IVA {a.partitaIva}</span>}
+          </span>
           <h1 className="text-[28px] font-extrabold tracking-tight">{a.nome}</h1>
         </div>
       </div>
-      {!posso && <Avviso tipo="info">Aziende e contratti li gestisce il super admin. Tu puoi consultarli.</Avviso>}
+      {!posso && <Avviso tipo="info">Clienti e contratti li gestisce il super admin. Tu puoi consultarli.</Avviso>}
 
+      {privato ? (
+        <div className="max-w-2xl">
+          <Riquadro titolo="Dati cliente privato" sotto="I clienti privati non hanno un contratto a chiamate: i loro ticket sono sempre fuori contratto.">
+            <Anagrafica a={a} posso={posso} onFatto={aggiorna} />
+          </Riquadro>
+        </div>
+      ) : (
       <div className="flex flex-wrap items-start gap-5">
         <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-5">
           <Riquadro titolo="Chiamate del contratto">
@@ -546,7 +601,8 @@ export function SchedaAzienda() {
           </Riquadro>
         </div>
       </div>
-      <Registro id={a.id} posso={posso} />
+      )}
+      {!privato && <Registro id={a.id} posso={posso} />}
     </div>
   );
 }

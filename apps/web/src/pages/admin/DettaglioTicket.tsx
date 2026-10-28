@@ -21,6 +21,7 @@ import { useAuth } from '../../auth';
 import { Storico } from '../../components/Storico';
 import { Allegati } from '../../components/Allegati';
 import { Avviso, Caricamento, Icona, dataBreve } from '../../components/ui';
+import { TipologiaPill } from '../../components/Cliente';
 import { BoxSoluzione, SchedaTicket } from '../cliente/DettaglioTicket';
 
 interface Bozza {
@@ -229,6 +230,7 @@ export default function DettaglioTicketAdmin() {
             </label>
           </div>
 
+          {t.azienda.tipologia === 'contratto' || t.chiamataScalata ? (
           <div className="flex flex-col gap-2 rounded-xl bg-fondo p-3">
             <label className={`flex min-h-10 items-center gap-3 text-sm font-semibold ${utente?.superAdmin ? '' : 'opacity-70'}`}>
               <input
@@ -246,6 +248,12 @@ export default function DettaglioTicketAdmin() {
               {!utente?.superAdmin && ' Solo il super admin può cambiarlo.'}
             </span>
           </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl bg-fondo p-3 text-xs text-muto">
+              <TipologiaPill tipologia={t.azienda.tipologia} breve={false} />
+              <span>Nessun contratto a chiamate: l'intervento è fuori contratto.</span>
+            </div>
+          )}
 
           <fieldset className="flex flex-col gap-1.5">
             <legend className="etichetta mb-1.5">Tempo impiegato</legend>

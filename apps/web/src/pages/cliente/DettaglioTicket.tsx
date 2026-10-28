@@ -16,7 +16,7 @@ import { Avviso, Caricamento, Icona, PrioritaPill, StatoPill, dataBreve } from '
 
 export function SchedaTicket({ t }: { t: TicketDTO }) {
   const righe: Array<[string, string]> = [
-    ['Azienda', t.azienda.nome],
+    [t.azienda.tipologia === 'privato' ? 'Cliente' : 'Azienda', t.azienda.nome],
     ['Richiedente', t.richiedente.nome],
     ['Categoria', CATEGORIA_LABEL[t.categoria]],
     ['Apparato', [TIPO_APPARATO_LABEL[t.tipoApparato], t.marcaModello].filter(Boolean).join(' · ')],
@@ -26,7 +26,7 @@ export function SchedaTicket({ t }: { t: TicketDTO }) {
     ['Aperto', dataBreve(t.createdAt)],
     ['Tecnico', t.tecnico?.nome || 'Non ancora assegnato'],
     ['Intervento', t.modalita ? MODALITA_LABEL[t.modalita] : '—'],
-    ['Copertura', t.fuoriContratto ? 'Fuori contratto' : 'A contratto (1 chiamata)'],
+    ['Copertura', t.fuoriContratto ? 'Fuori contratto' : 'A contratto (1 chiamata)'] as [string, string],
   ];
   return (
     <article className="card flex flex-col gap-5 p-5">

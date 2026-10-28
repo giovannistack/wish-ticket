@@ -5,7 +5,7 @@ import type { z } from 'zod';
 import type { nuovoTicketSchema } from '@wish/shared';
 import { AziendaModel, StoricoModel, TicketModel, UtenteModel, prossimoNumeroTicket } from '../models/index.js';
 import { annullaPrenotazione, prenotaChiamata, registra, type EsitoApertura } from './contratto.js';
-import { popolaTicket } from './ticket.js';
+import { etichettaCliente, popolaTicket } from './ticket.js';
 import { ticketDTO } from './dto.js';
 
 type DatiTicket = z.output<typeof nuovoTicketSchema>;
@@ -50,7 +50,7 @@ export async function creaTicket(
   }
 
   const [azienda, richiedente, autore] = await Promise.all([
-    AziendaModel.findById(aziendaId, { nome: 1 }).lean(),
+    AziendaModel.findById(aziendaId, { nome: 1, tipo: 1 }).lean(),
     UtenteModel.findById(o.richiedenteId, { nome: 1, cognome: 1, email: 1, ruolo: 1 }).lean(),
     UtenteModel.findById(o.autoreId, { nome: 1, cognome: 1 }).lean(),
   ]);
@@ -97,7 +97,7 @@ export async function creaTicket(
       oggetto: `${bloccante ? '[BLOCCANTE] ' : ''}${ticket.numero} · ${azienda?.nome}: ${dati.oggetto}`,
       titolo: `Nuovo ticket ${ticket.numero} · ${azienda?.nome}`,
       paragrafi: [
-        `${richiedente?.nome} ${richiedente?.cognome} (${azienda?.nome}) ha aperto un ticket con priorità ${PRIORITA_LABEL[dati.priorita].nome.toLowerCase()}.`,
+        `${richiedente?.nome} ${richiedente?.cognome} (${azienda?.tipo === 'privato' ? 'cliente privato' : azienda?.nome}) ha aperto un ticket con priorità ${PRIORITA_LABEL[dati.priorita].nome.toLowerCase()}.`,
         dati.oggetto,
         dati.descrizione,
       ],
@@ -110,7 +110,7 @@ export async function creaTicket(
       oggetto: `Ticket ${ticket.numero} ${o.daWish ? 'aperto' : 'ricevuto'} · ${azienda?.nome} · Wish Assistenza`,
       titolo: o.daWish ? `Wish ha aperto per te il ticket ${ticket.numero}` : `Abbiamo ricevuto il ticket ${ticket.numero}`,
       paragrafi: [
-        `Azienda: ${azienda?.nome} · Richiedente: ${richiedente.nome} ${richiedente.cognome}`,
+        `${etichettaCliente(azienda)} · Richiedente: ${richiedente.nome} ${richiedente.cognome}`,
         `"${dati.oggetto}"`,
         'Il team Wish lo segue e ti avviserà a ogni aggiornamento.',
       ],

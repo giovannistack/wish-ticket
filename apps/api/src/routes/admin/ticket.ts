@@ -18,7 +18,7 @@ import { AziendaModel, NotaModel, StoricoModel, TicketModel, UtenteModel } from 
 import { valida } from '../../lib/valida.js';
 import { ErroreApi, nonTrovato, vietato } from '../../lib/errori.js';
 import { ticketDTO } from '../../lib/dto.js';
-import { popolaTicket, testoEvento, ticketAdmin } from '../../lib/ticket.js';
+import { etichettaCliente, popolaTicket, testoEvento, ticketAdmin } from '../../lib/ticket.js';
 import { restituisci, scala } from '../../lib/contratto.js';
 import { creaTicket } from '../../lib/creaTicket.js';
 import { eliminaAllegatiTicket, salvaAllegato } from '../../lib/allegati.js';
@@ -99,7 +99,7 @@ const routes: FastifyPluginAsync = async (app) => {
           oggetto: `${t.numero} · ${nomeAzienda(t)}: nuovo documento da Wish`,
           titolo: `Nuovo documento sul ticket ${t.numero}`,
           paragrafi: [
-            `Azienda: ${nomeAzienda(t)} · Ticket: ${t.oggetto}`,
+            `${etichettaCliente(t.aziendaId)} · Ticket: ${t.oggetto}`,
             `Il team Wish ha aggiunto "${a.nomeOriginale}".`,
             ...(a.nota ? [a.nota] : []),
           ],
@@ -241,7 +241,7 @@ const routes: FastifyPluginAsync = async (app) => {
       titolo: `${t.numero} · ${t.oggetto}`,
       paragrafi: [
         `Ciao ${tecnico.nome}, ${autore ? `${autore.nome} ${autore.cognome}` : 'il team'} ti ha assegnato questo ticket.`,
-        `Azienda: ${azienda}${richiedente ? ` · Richiedente: ${richiedente.nome ?? ''} ${richiedente.cognome ?? ''}` : ''}${t.telefono ? ` · Tel. ${t.telefono}` : ''}`,
+        `${etichettaCliente(t.aziendaId)}${richiedente ? ` · Richiedente: ${richiedente.nome ?? ''} ${richiedente.cognome ?? ''}` : ''}${t.telefono ? ` · Tel. ${t.telefono}` : ''}`,
         `Priorità: ${PRIORITA_LABEL[t.priorita as Priorita].nome}`,
         t.descrizione,
       ],
@@ -274,7 +274,7 @@ const routes: FastifyPluginAsync = async (app) => {
       a: richiedente.email,
       oggetto: `${t.numero} · ${nomeAzienda(t)}: ${STATO_TICKET_LABEL[t.stato as StatoTicket].toLowerCase()} · Wish Assistenza`,
       titolo: `${t.numero} · ${t.oggetto}`,
-      paragrafi: [`Azienda: ${nomeAzienda(t)}`, ...paragrafi],
+      paragrafi: [etichettaCliente(t.aziendaId), ...paragrafi],
       bottone: { testo: 'Vedi il ticket', url: `${app.cfg.urlPubblico}/ticket/${t._id}` },
     });
   }

@@ -82,6 +82,27 @@ export const DISPONIBILITA_LABEL: Record<Disponibilita, string> = {
   pomeriggio: 'Pomeriggio (14–18)',
 };
 
+/** Che cos'è un cliente: un'azienda o una persona privata. */
+export const TIPI_CLIENTE = ['azienda', 'privato'] as const;
+export type TipoCliente = (typeof TIPI_CLIENTE)[number];
+
+/** Come lo vede Wish: dipende dal tipo e dal contratto. */
+export const TIPOLOGIE_CLIENTE = ['contratto', 'senza_contratto', 'privato'] as const;
+export type TipologiaCliente = (typeof TIPOLOGIE_CLIENTE)[number];
+export const TIPOLOGIA_CLIENTE_LABEL: Record<TipologiaCliente, string> = {
+  contratto: 'Azienda con contratto',
+  senza_contratto: 'Azienda senza contratto',
+  privato: 'Cliente privato',
+};
+export function tipologiaCliente(c: { tipo?: string | null; contratto?: { attivo?: boolean | null } | null }): TipologiaCliente {
+  if (c.tipo === 'privato') return 'privato';
+  return c.contratto?.attivo ? 'contratto' : 'senza_contratto';
+}
+
+/** Cosa ha indicato chi si registra nel menu "La tua azienda". */
+export const RICHIESTE_CLIENTE = ['esistente', 'nuova', 'privato'] as const;
+export type RichiestaCliente = (typeof RICHIESTE_CLIENTE)[number];
+
 // ---------- Schemi condivisi tra form e API ----------
 
 const testo = (min: number, max: number, campo: string) =>
@@ -99,16 +120,49 @@ export const passwordSchema = z
 
 export const objectIdSchema = z.string().regex(/^[a-f0-9]{24}$/i, 'Identificativo non valido');
 
-export const registrazioneSchema = z.object({
-  nome: testo(2, 60, 'Nome'),
-  cognome: testo(2, 60, 'Cognome'),
-  email: z.email('Email non valida').trim().toLowerCase().max(160),
-  telefono: z.string().trim().max(30).optional().default(''),
-  ufficio: z.string().trim().max(80).optional().default(''),
-  aziendaDichiarataId: objectIdSchema,
-  password: passwordSchema,
-  privacy: z.literal(true, { error: "Serve il consenso all'informativa privacy" }),
-});
+/** Partita IVA italiana: 11 cifre (spazi e prefisso IT tollerati). */
+export const partitaIvaSchema = z
+  .string()
+  .trim()
+  .transform((v) => v.replace(/\s+/g, '').replace(/^IT/i, ''))
+  .pipe(z.string().regex(/^\d{11}$/, 'La partita IVA ha 11 cifre'));
+
+export const telefonoSchema = z
+  .string()
+  .trim()
+  .min(1, 'Inserisci il telefono')
+  .max(30, 'Telefono troppo lungo')
+  .regex(/^\+?[\d\s./-]{6,}$/, 'Telefono non valido');
+
+/**
+ * Registrazione. Nel menu "La tua azienda" si sceglie un'azienda dell'elenco (id),
+ * "nuova" (con denominazione e partita IVA) oppure "privato".
+ */
+export const registrazioneSchema = z
+  .object({
+    nome: testo(2, 60, 'Nome'),
+    cognome: testo(2, 60, 'Cognome'),
+    email: z.email('Email non valida').trim().toLowerCase().max(160),
+    telefono: telefonoSchema,
+    ufficio: z.string().trim().max(80).optional().default(''),
+    azienda: z.union([objectIdSchema, z.literal('nuova'), z.literal('privato')], { error: 'Scegli la tua azienda o "Privato"' }),
+    denominazione: z.string().trim().max(160).optional().default(''),
+    partitaIva: z.string().trim().max(20).optional().default(''),
+    password: passwordSchema,
+    privacy: z.literal(true, { error: "Serve il consenso all'informativa privacy" }),
+  })
+  .superRefine((d, ctx) => {
+    if (d.azienda !== 'nuova') return;
+    if (d.denominazione.length < 2) ctx.addIssue({ code: 'custom', path: ['denominazione'], message: "Inserisci la denominazione dell'azienda" });
+    const piva = partitaIvaSchema.safeParse(d.partitaIva);
+    if (!piva.success) ctx.addIssue({ code: 'custom', path: ['partitaIva'], message: d.partitaIva ? 'La partita IVA ha 11 cifre' : 'Inserisci la partita IVA' });
+  })
+  .transform((d) => ({
+    ...d,
+    ufficio: d.azienda === 'privato' ? '' : d.ufficio,
+    denominazione: d.azienda === 'nuova' ? d.denominazione : '',
+    partitaIva: d.azienda === 'nuova' ? d.partitaIva.replace(/\s+/g, '').replace(/^IT/i, '') : '',
+  }));
 export type RegistrazioneInput = z.input<typeof registrazioneSchema>;
 
 export const loginSchema = z.object({
@@ -128,10 +182,26 @@ export const resetPasswordSchema = z.object({
   password: passwordSchema,
 });
 
-export const attivaUtenteSchema = z.object({
-  aziendaId: objectIdSchema,
-  ruolo: z.enum(['referente', 'utente']).default('utente'),
-});
+/**
+ * Attivazione di un utente da parte di Wish:
+ * - esistente: lo associa a un cliente già presente (azienda o privato)
+ * - nuova_azienda: crea l'azienda (senza contratto) e ce lo associa
+ * - privato: crea il cliente privato a suo nome
+ * Senza "modo" vale "esistente" (compatibilità con le versioni precedenti).
+ */
+export const attivaUtenteSchema = z.preprocess(
+  (v) => (v && typeof v === 'object' && !('modo' in v) ? { ...v, modo: 'esistente' } : v),
+  z.discriminatedUnion('modo', [
+    z.object({ modo: z.literal('esistente'), aziendaId: objectIdSchema, ruolo: z.enum(['referente', 'utente']).default('utente') }),
+    z.object({
+      modo: z.literal('nuova_azienda'),
+      nome: testo(2, 120, 'Denominazione'),
+      partitaIva: partitaIvaSchema,
+      ruolo: z.enum(['referente', 'utente']).default('referente'),
+    }),
+    z.object({ modo: z.literal('privato') }),
+  ]),
+);
 export type AttivaUtenteInput = z.input<typeof attivaUtenteSchema>;
 
 export const nuovoTicketSchema = z.object({
@@ -149,9 +219,23 @@ export type NuovoTicketInput = z.input<typeof nuovoTicketSchema>;
 
 export const nuovaAziendaSchema = z.object({
   nome: testo(2, 120, 'Nome'),
+  tipo: z.enum(TIPI_CLIENTE).optional().default('azienda'),
   ragioneSociale: z.string().trim().max(160).optional().default(''),
+  partitaIva: z.union([z.literal(''), partitaIvaSchema]).optional().default(''),
   sede: z.string().trim().max(160).optional().default(''),
 });
+
+/** Modifica di un cliente: solo i campi inviati, nessun valore predefinito. */
+export const aggiornaAziendaSchema = z
+  .object({
+    nome: testo(2, 120, 'Nome'),
+    tipo: z.enum(TIPI_CLIENTE),
+    ragioneSociale: z.string().trim().max(160),
+    partitaIva: z.union([z.literal(''), partitaIvaSchema]),
+    sede: z.string().trim().max(160),
+    attiva: z.boolean(),
+  })
+  .partial();
 
 const dataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data non valida (AAAA-MM-GG)');
 
@@ -236,6 +320,13 @@ export type ModificaMovimentoInput = z.input<typeof modificaMovimentoSchema>;
 
 // ---------- Tipi delle risposte API ----------
 
+/** Riferimento a un cliente (azienda o privato) con la sua tipologia. */
+export interface RifCliente {
+  id: string;
+  nome: string;
+  tipologia: TipologiaCliente;
+}
+
 export interface UtenteDTO {
   id: string;
   nome: string;
@@ -248,8 +339,10 @@ export interface UtenteDTO {
   superAdmin: boolean;
   stato: StatoUtente;
   emailVerificata: boolean;
-  azienda: { id: string; nome: string } | null;
+  azienda: RifCliente | null;
   aziendaDichiarata: { id: string; nome: string } | null;
+  /** Cosa ha indicato in registrazione (nuova azienda: denominazione e partita IVA). */
+  richiesta: { tipo: RichiestaCliente; denominazione: string; partitaIva: string };
   ultimoAccesso: string | null;
   createdAt: string;
 }
@@ -271,7 +364,10 @@ export interface ContrattoDTO {
 export interface AziendaDTO {
   id: string;
   nome: string;
+  tipo: TipoCliente;
+  tipologia: TipologiaCliente;
   ragioneSociale: string;
+  partitaIva: string;
   sede: string;
   attiva: boolean;
   contratto: ContrattoDTO;
@@ -300,7 +396,7 @@ export interface AziendaConStatsDTO extends AziendaDTO {
 export interface TicketDTO {
   id: string;
   numero: string;
-  azienda: { id: string; nome: string };
+  azienda: RifCliente;
   richiedente: { id: string; nome: string };
   oggetto: string;
   categoria: Categoria;

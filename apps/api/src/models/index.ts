@@ -9,6 +9,8 @@ import {
   STATI_TICKET,
   STATI_UTENTE,
   TIPI_APPARATO,
+  TIPI_CLIENTE,
+  RICHIESTE_CLIENTE,
 } from '@wish/shared';
 
 const { ObjectId } = Schema.Types;
@@ -17,7 +19,10 @@ const { ObjectId } = Schema.Types;
 const aziendaSchema = new Schema(
   {
     nome: { type: String, required: true, trim: true },
+    // azienda o persona privata; per un privato il nome è "Nome Cognome"
+    tipo: { type: String, enum: TIPI_CLIENTE, default: 'azienda' },
     ragioneSociale: { type: String, default: '' },
+    partitaIva: { type: String, default: '' },
     sede: { type: String, default: '' },
     attiva: { type: Boolean, default: true },
     // Contratto annuale di assistenza: numero di chiamate incluse nel periodo
@@ -35,6 +40,8 @@ const aziendaSchema = new Schema(
 aziendaSchema.index({ nome: 1 }, { unique: true });
 export type Azienda = InferSchemaType<typeof aziendaSchema>;
 export const AziendaModel = mongoose.model('Azienda', aziendaSchema, 'aziende');
+/** Campi da caricare con populate per mostrare nome e tipologia di un cliente. */
+export const CAMPI_CLIENTE = 'nome tipo contratto.attivo';
 
 // ---------- Utenti ----------
 const utenteSchema = new Schema(
@@ -52,6 +59,12 @@ const utenteSchema = new Schema(
     // null finché l'admin non conferma l'azienda; sempre null per gli admin
     aziendaId: { type: ObjectId, ref: 'Azienda', default: null },
     aziendaDichiarataId: { type: ObjectId, ref: 'Azienda', default: null },
+    // Cosa ha scelto in registrazione: azienda dell'elenco, nuova azienda (con dati) o privato
+    richiesta: {
+      tipo: { type: String, enum: RICHIESTE_CLIENTE, default: 'esistente' },
+      denominazione: { type: String, default: '' },
+      partitaIva: { type: String, default: '' },
+    },
     emailVerificata: { type: Boolean, default: false },
     tokenVerificaHash: { type: String, default: null },
     tokenResetHash: { type: String, default: null },

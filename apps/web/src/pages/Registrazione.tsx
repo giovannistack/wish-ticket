@@ -20,6 +20,10 @@ export default function Registrazione() {
   const navigate = useNavigate();
   const { campi, generale, valida, daErrore, pulisci } = useErroriForm();
   const [password, setPassword] = useState('');
+  // "" = da scegliere, id = azienda dell'elenco, "nuova" = azienda da inserire, "privato"
+  const [scelta, setScelta] = useState('');
+  const privato = scelta === 'privato';
+  const nuova = scelta === 'nuova';
   const [invio, setInvio] = useState(false);
   const aziende = useQuery({
     queryKey: ['aziende-pubbliche'],
@@ -57,23 +61,52 @@ export default function Registrazione() {
           </div>
           <Selezione
             etichetta="La tua azienda"
-            name="aziendaDichiarataId"
-            defaultValue=""
-            errore={campi.aziendaDichiarataId ? 'Seleziona la tua azienda' : undefined}
-            aiuto="L'associazione all'azienda viene confermata da Wish."
+            name="azienda"
+            value={scelta}
+            onChange={(e) => setScelta(e.target.value)}
+            errore={campi.azienda ? 'Scegli la tua azienda, "Nuova azienda" o "Privato"' : undefined}
+            aiuto={
+              privato
+                ? 'Ti registri come persona privata.'
+                : nuova
+                  ? 'Inserisci i dati della tua azienda: Wish li verifica prima di attivare l\'account.'
+                  : "L'associazione all'azienda viene confermata da Wish."
+            }
           >
             <option value="" disabled>
               {aziende.isLoading ? 'Caricamento…' : 'Seleziona…'}
             </option>
-            {aziende.data?.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nome}
-              </option>
-            ))}
+            <option value="privato">Privato</option>
+            <option value="nuova">+ Inserisci nuova azienda</option>
+            {!!aziende.data?.length && (
+              <optgroup label="Aziende già clienti Wish">
+                {aziende.data.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nome}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </Selezione>
-          <Campo etichetta={<>Ufficio o reparto <span className="font-normal text-muto">(facoltativo)</span></>} name="ufficio" placeholder="Es. Amministrazione" errore={campi.ufficio} />
-          <Campo etichetta="Email aziendale" name="email" type="email" autoComplete="email" inputMode="email" placeholder="nome@azienda.it" errore={campi.email} />
-          <Campo etichetta="Telefono" name="telefono" type="tel" autoComplete="tel" errore={campi.telefono} />
+          {nuova && (
+            <div className="grid gap-3 rounded-xl bg-fondo p-3 sm:grid-cols-[1fr_180px]">
+              <Campo etichetta="Denominazione azienda" name="denominazione" autoComplete="organization" errore={campi.denominazione} />
+              <Campo etichetta="Partita IVA" name="partitaIva" inputMode="numeric" maxLength={16} placeholder="11 cifre" errore={campi.partitaIva} />
+            </div>
+          )}
+          {!privato && (
+            <Campo etichetta={<>Ufficio o reparto <span className="font-normal text-muto">(facoltativo)</span></>} name="ufficio" placeholder="Es. Amministrazione" errore={campi.ufficio} />
+          )}
+          <Campo
+            etichetta={privato ? 'Email' : 'Email aziendale'}
+            name="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            placeholder={privato ? 'nome@email.it' : 'nome@azienda.it'}
+            errore={campi.email}
+          />
+          <Campo etichetta="Telefono" name="telefono" type="tel" autoComplete="tel" placeholder="Numero a cui Wish può richiamarti" errore={campi.telefono} />
           <div className="flex flex-col gap-1.5">
             <Campo
               etichetta="Password"

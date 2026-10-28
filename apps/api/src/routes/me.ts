@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { UtenteModel } from '../models/index.js';
+import { CAMPI_CLIENTE, UtenteModel } from '../models/index.js';
 import { utenteDTO } from '../lib/dto.js';
 import { valida } from '../lib/valida.js';
 import { nonAutorizzato } from '../lib/errori.js';
@@ -14,7 +14,7 @@ const routes: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', app.autentica);
 
   const carica = async (id: string) => {
-    const u = await UtenteModel.findById(id).populate('aziendaId', 'nome').populate('aziendaDichiarataId', 'nome').lean();
+    const u = await UtenteModel.findById(id).populate('aziendaId', CAMPI_CLIENTE).populate('aziendaDichiarataId', 'nome').lean();
     if (!u) throw nonAutorizzato();
     return utenteDTO(u);
   };

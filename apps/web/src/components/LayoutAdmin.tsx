@@ -51,7 +51,7 @@ export default function LayoutAdmin() {
             Utenti e accessi
           </VoceMenu>
           <VoceMenu to="/admin/aziende" icona="azienda">
-            Aziende
+            Clienti
           </VoceMenu>
           <VoceMenu to="/admin/team" icona="team">
             Team Wish

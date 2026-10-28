@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { attivaUtenteSchema, objectIdSchema, STATI_UTENTE } from '@wish/shared';
-import { AziendaModel, RefreshTokenModel, StoricoModel, TicketModel, UtenteModel } from '../../models/index.js';
+import { AziendaModel, CAMPI_CLIENTE, RefreshTokenModel, StoricoModel, TicketModel, UtenteModel } from '../../models/index.js';
 import { valida } from '../../lib/valida.js';
 import { ErroreApi, nonTrovato, vietato } from '../../lib/errori.js';
 import { utenteDTO } from '../../lib/dto.js';
@@ -23,7 +23,7 @@ const routes: FastifyPluginAsync = async (app) => {
     return u;
   };
   const dto = async (id: Types.ObjectId) =>
-    utenteDTO(await UtenteModel.findById(id).populate('aziendaId', 'nome').populate('aziendaDichiarataId', 'nome').lean());
+    utenteDTO(await UtenteModel.findById(id).populate('aziendaId', CAMPI_CLIENTE).populate('aziendaDichiarataId', 'nome').lean());
   const revocaSessioni = (utenteId: Types.ObjectId) =>
     RefreshTokenModel.updateMany({ utenteId, revocato: false }, { $set: { revocato: true } });
 
@@ -35,26 +35,61 @@ const routes: FastifyPluginAsync = async (app) => {
     const utenti = await UtenteModel.find(filtro)
       .sort({ createdAt: -1 })
       .limit(500)
-      .populate('aziendaId', 'nome')
+      .populate('aziendaId', CAMPI_CLIENTE)
       .populate('aziendaDichiarataId', 'nome')
       .lean();
     return utenti.map(utenteDTO);
   });
 
+  /** Crea il cliente privato a nome dell'utente (in caso di omonimia si aggiunge l'email). */
+  async function creaPrivato(u: { nome: string; cognome: string; email: string; telefono?: string | null }) {
+    const base = `${u.nome} ${u.cognome}`.trim();
+    for (const nome of [base, `${base} (${u.email})`]) {
+      if (await AziendaModel.exists({ nome })) continue;
+      return AziendaModel.create({ nome, tipo: 'privato' });
+    }
+    throw new ErroreApi(409, 'Esiste già un cliente con questo nome: associalo dall\'elenco', 'DUPLICATO');
+  }
+
   app.post<{ Params: { id: string } }>('/:id/attiva', async (req) => {
-    const { aziendaId, ruolo } = valida(attivaUtenteSchema, req.body);
+    const dati = valida(attivaUtenteSchema, req.body);
     const u = await trova(req.params.id);
-    const azienda = await AziendaModel.findOne({ _id: aziendaId, attiva: true }).lean();
-    if (!azienda) throw new ErroreApi(400, 'Azienda non valida', 'AZIENDA_NON_VALIDA');
+
+    let azienda: { _id: Types.ObjectId; nome: string; tipo?: string | null };
+    let creato = false;
+    if (dati.modo === 'esistente') {
+      const a = await AziendaModel.findOne({ _id: dati.aziendaId, attiva: true }).lean();
+      if (!a) throw new ErroreApi(400, 'Azienda non valida', 'AZIENDA_NON_VALIDA');
+      azienda = a;
+    } else if (dati.modo === 'nuova_azienda') {
+      if (await AziendaModel.exists({ nome: dati.nome })) {
+        throw new ErroreApi(409, "Esiste già un'azienda con questo nome: associala dall'elenco", 'DUPLICATO');
+      }
+      azienda = await AziendaModel.create({ nome: dati.nome, tipo: 'azienda', partitaIva: dati.partitaIva });
+      creato = true;
+    } else {
+      azienda = await creaPrivato(u);
+      creato = true;
+    }
+    const privato = azienda.tipo === 'privato';
+    const ruolo = dati.modo === 'privato' || privato ? 'referente' : dati.ruolo;
 
     const primaAttivazione = u.stato !== 'attivo';
-    const cambioAzienda = !!u.aziendaId && String(u.aziendaId) !== aziendaId;
+    const cambioAzienda = !!u.aziendaId && String(u.aziendaId) !== String(azienda._id);
     u.stato = 'attivo';
     u.aziendaId = azienda._id;
     u.ruolo = ruolo;
     await u.save();
     // Se cambia azienda, le sessioni aperte non devono più valere per i dati della vecchia.
     if (cambioAzienda) await revocaSessioni(u._id);
+    if (creato) {
+      await StoricoModel.create({
+        aziendaId: azienda._id,
+        autoreId: req.utente.id,
+        azione: 'cliente_creato',
+        dettagli: { testo: `${privato ? 'Cliente privato' : 'Azienda'} creato all'attivazione di ${u.email}` },
+      });
+    }
     await StoricoModel.create({
       aziendaId: azienda._id,
       autoreId: req.utente.id,
@@ -68,7 +103,7 @@ const routes: FastifyPluginAsync = async (app) => {
         oggetto: 'Il tuo account è attivo · Wish Assistenza',
         titolo: `Benvenuto, ${u.nome}!`,
         paragrafi: [
-          `Il tuo account per ${azienda.nome} è stato attivato.`,
+          privato ? 'Il tuo account è stato attivato.' : `Il tuo account per ${azienda.nome} è stato attivato.`,
           'Da ora puoi aprire ticket di assistenza e seguirne lo stato. Riceverai una notifica a ogni aggiornamento.',
         ],
         bottone: { testo: 'Accedi', url: `${app.cfg.urlPubblico}/accesso` },

@@ -1,4 +1,4 @@
-import type { AziendaDTO, TicketDTO, UtenteDTO } from '@wish/shared';
+import { tipologiaCliente, type AziendaDTO, type RifCliente, type TicketDTO, type UtenteDTO } from '@wish/shared';
 import type { Types } from 'mongoose';
 import { contrattoDTO } from './contratto.js';
 
@@ -11,6 +11,14 @@ function riferimento(r: Ref, conNome: (o: { nome?: string; cognome?: string }) =
 }
 
 const nomeAzienda = (o: { nome?: string }) => o.nome ?? '';
+
+/** Cliente popolato con CAMPI_CLIENTE → id, nome e tipologia. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function rifCliente(a: any): RifCliente | null {
+  if (!a) return null;
+  if (!a._id) return { id: String(a), nome: '', tipologia: 'senza_contratto' };
+  return { id: String(a._id), nome: a.nome ?? '', tipologia: tipologiaCliente(a) };
+}
 const nomePersona = (o: { nome?: string; cognome?: string }) => `${o.nome ?? ''} ${o.cognome ?? ''}`.trim();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,8 +34,13 @@ export function utenteDTO(u: any): UtenteDTO {
     superAdmin: !!u.superAdmin,
     stato: u.stato,
     emailVerificata: !!u.emailVerificata,
-    azienda: riferimento(u.aziendaId, nomeAzienda),
+    azienda: rifCliente(u.aziendaId),
     aziendaDichiarata: riferimento(u.aziendaDichiarataId, nomeAzienda),
+    richiesta: {
+      tipo: u.richiesta?.tipo ?? 'esistente',
+      denominazione: u.richiesta?.denominazione ?? '',
+      partitaIva: u.richiesta?.partitaIva ?? '',
+    },
     ultimoAccesso: u.ultimoAccesso ? new Date(u.ultimoAccesso).toISOString() : null,
     createdAt: new Date(u.createdAt).toISOString(),
   };
@@ -38,7 +51,10 @@ export function aziendaDTO(a: any): AziendaDTO {
   return {
     id: String(a._id),
     nome: a.nome,
+    tipo: a.tipo === 'privato' ? 'privato' : 'azienda',
+    tipologia: tipologiaCliente(a),
     ragioneSociale: a.ragioneSociale ?? '',
+    partitaIva: a.partitaIva ?? '',
     sede: a.sede ?? '',
     attiva: !!a.attiva,
     contratto: contrattoDTO(a.contratto),
@@ -50,7 +66,7 @@ export function ticketDTO(t: any): TicketDTO {
   return {
     id: String(t._id),
     numero: t.numero,
-    azienda: riferimento(t.aziendaId, nomeAzienda)!,
+    azienda: rifCliente(t.aziendaId)!,
     richiedente: (t.richiedenteId && t.richiedenteId._id) ? riferimento(t.richiedenteId, nomePersona)! : { id: '', nome: 'Utente eliminato' },
     oggetto: t.oggetto,
     categoria: t.categoria,

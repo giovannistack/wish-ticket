@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   contrattoSchema,
   modificaMovimentoSchema,
+  aggiornaAziendaSchema,
   nuovaAziendaSchema,
   rettificaSchema,
   rinnovoSchema,
@@ -16,8 +17,6 @@ import { valida } from '../../lib/valida.js';
 import { ErroreApi, nonTrovato } from '../../lib/errori.js';
 import { aziendaDTO } from '../../lib/dto.js';
 import { movimentoDTO, registra } from '../../lib/contratto.js';
-
-const aggiornaSchema = nuovaAziendaSchema.partial().extend({ attiva: z.boolean().optional() });
 
 const data = (s: string) => new Date(`${s}T00:00:00.000Z`);
 const isoGiorno = (d: Date) => d.toISOString().slice(0, 10);
@@ -68,7 +67,7 @@ const routes: FastifyPluginAsync = async (app) => {
   });
 
   app.patch<{ Params: { id: string } }>('/:id', superAdmin, async (req) => {
-    const dati = valida(aggiornaSchema, req.body);
+    const dati = valida(aggiornaAziendaSchema, req.body);
     const a = await trova(req.params.id);
     if (dati.nome && dati.nome !== a.nome && (await AziendaModel.exists({ nome: dati.nome }))) {
       throw new ErroreApi(409, "Esiste già un'azienda con questo nome", 'DUPLICATO');
@@ -82,6 +81,7 @@ const routes: FastifyPluginAsync = async (app) => {
   app.put<{ Params: { id: string } }>('/:id/contratto', superAdmin, async (req) => {
     const dati = valida(contrattoSchema, req.body);
     const a = await trova(req.params.id);
+    if (a.tipo === 'privato' && dati.attivo) throw new ErroreApi(400, 'I clienti privati non hanno un contratto a chiamate', 'PRIVATO');
     const c = a.contratto!;
     const eraAttivo = !!c.attivo;
     let motivo: string;

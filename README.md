@@ -40,6 +40,14 @@ Web app di ticketing per l'assistenza tecnica Wish. Tre aziende clienti (MODO SP
 - Il super admin apre ticket per conto di un cliente (azienda, richiedente, stesso modulo) e può aprirli fuori contratto.
 - Il super admin modifica le righe del registro chiamate (motivo e numero), scegliendo se aggiornare anche il saldo.
 
+**Tipologie di cliente: aziende con e senza contratto, privati**
+- In registrazione il menu "La tua azienda" offre le aziende già clienti, **+ Inserisci nuova azienda** (denominazione e partita IVA di 11 cifre, obbligatorie) e **Privato** (senza ufficio, "Email" al posto di "Email aziendale"). Il telefono è obbligatorio per tutti; l'ufficio resta facoltativo.
+- L'elenco pubblico della registrazione mostra solo le aziende, mai i privati.
+- All'attivazione Wish vede cosa ha dichiarato l'utente (con P.IVA, email e telefono cliccabili) e sceglie: cliente esistente, nuova azienda senza contratto, nuovo cliente privato.
+- Ogni cliente ha una tipologia: **azienda con contratto**, **azienda senza contratto**, **cliente privato**. Si vede con un bollino in dashboard, Utenti e accessi e Clienti, e si può filtrare. Un privato è un cliente a sé: vede solo i propri ticket.
+- I ticket di clienti senza contratto e privati sono sempre fuori contratto e non vengono mai bloccati. Un privato non può avere un contratto a chiamate.
+- La pagina Aziende si chiama ora **Clienti**: cerca per nome o P.IVA e crea anche clienti privati.
+
 **Prossime fasi**: messaggi e allegati nei ticket (2), notifiche push/SSE e comunicazioni (4), report, apparati e collegamento con il calendario interventi (5).
 
 ## Struttura

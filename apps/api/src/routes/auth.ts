@@ -9,7 +9,7 @@ import {
   tokenSchema,
   type LoginResponse,
 } from '@wish/shared';
-import { AziendaModel, RefreshTokenModel, UtenteModel } from '../models/index.js';
+import { AziendaModel, CAMPI_CLIENTE, RefreshTokenModel, UtenteModel } from '../models/index.js';
 import { valida } from '../lib/valida.js';
 import { ErroreApi, nonAutorizzato } from '../lib/errori.js';
 import { hashToken, tokenCasuale } from '../lib/sicurezza.js';
@@ -27,7 +27,7 @@ const routes: FastifyPluginAsync = async (app) => {
   const cookiePath = '/api/auth';
 
   async function emettiSessione(reply: FastifyReply, utenteId: Types.ObjectId): Promise<LoginResponse> {
-    const u = await UtenteModel.findById(utenteId).populate('aziendaId', 'nome').populate('aziendaDichiarataId', 'nome').lean();
+    const u = await UtenteModel.findById(utenteId).populate('aziendaId', CAMPI_CLIENTE).populate('aziendaDichiarataId', 'nome').lean();
     if (!u) throw nonAutorizzato();
     const refresh = tokenCasuale();
     const scadenza = new Date(Date.now() + cfg.refreshTokenGiorni * 86400_000);
@@ -48,8 +48,13 @@ const routes: FastifyPluginAsync = async (app) => {
     { config: { rateLimit: { max: cfg.limiteRegistrazione, timeWindow: '1 hour' } } },
     async (req, reply) => {
       const dati = valida(registrazioneSchema, req.body);
-      const azienda = await AziendaModel.findOne({ _id: dati.aziendaDichiarataId, attiva: true }).lean();
-      if (!azienda) throw new ErroreApi(400, 'Seleziona la tua azienda', 'AZIENDA_NON_VALIDA');
+      let azienda: { _id: Types.ObjectId; nome: string } | null = null;
+      if (dati.azienda !== 'nuova' && dati.azienda !== 'privato') {
+        // nell'elenco pubblico ci sono solo aziende attive (mai i privati)
+        azienda = await AziendaModel.findOne({ _id: dati.azienda, attiva: true, tipo: { $ne: 'privato' } }, { nome: 1 }).lean();
+        if (!azienda) throw new ErroreApi(400, 'Seleziona la tua azienda', 'AZIENDA_NON_VALIDA');
+      }
+      const tipoRichiesta = dati.azienda === 'nuova' ? 'nuova' : dati.azienda === 'privato' ? 'privato' : 'esistente';
 
       // Stessa risposta anche se l'email esiste già: non si rivela chi è registrato.
       const esistente = await UtenteModel.exists({ email: dati.email });
@@ -66,7 +71,8 @@ const routes: FastifyPluginAsync = async (app) => {
         ruolo: 'utente',
         stato: 'in_attesa',
         aziendaId: null,
-        aziendaDichiarataId: azienda._id,
+        aziendaDichiarataId: azienda?._id ?? null,
+        richiesta: { tipo: tipoRichiesta, denominazione: dati.denominazione, partitaIva: dati.partitaIva },
         tokenVerificaHash: hashToken(tokenVerifica),
       });
 
@@ -80,13 +86,20 @@ const routes: FastifyPluginAsync = async (app) => {
         ],
         bottone: { testo: 'Conferma email', url: `${cfg.urlPubblico}/verifica-email?token=${tokenVerifica}` },
       });
+      const chi =
+        tipoRichiesta === 'privato'
+          ? 'come cliente privato'
+          : tipoRichiesta === 'nuova'
+            ? `per una nuova azienda: ${dati.denominazione}, P.IVA ${dati.partitaIva}`
+            : `indicando l'azienda ${azienda!.nome}`;
       await mailer.invia({
         a: cfg.emailAvvisiAdmin,
-        oggetto: `Nuova registrazione da attivare: ${utente.nome} ${utente.cognome}`,
+        oggetto: `Nuova registrazione da attivare: ${utente.nome} ${utente.cognome}${tipoRichiesta === 'privato' ? ' (privato)' : tipoRichiesta === 'nuova' ? ` · ${dati.denominazione}` : ` · ${azienda!.nome}`}`,
         titolo: 'Nuova richiesta di accesso',
         paragrafi: [
-          `${utente.nome} ${utente.cognome} (${utente.email}) si è registrato indicando l'azienda ${azienda.nome}.`,
-          'Verifica i dati e attiva l\'account dalla pagina Utenti e accessi.',
+          `${utente.nome} ${utente.cognome} si è registrato ${chi}.`,
+          `Email: ${utente.email} · Telefono: ${utente.telefono}${utente.ufficio ? ` · Ufficio: ${utente.ufficio}` : ''}`,
+          "Verifica i dati e attiva l'account dalla pagina Utenti e accessi.",
         ],
         bottone: { testo: 'Apri Utenti e accessi', url: `${cfg.urlPubblico}/admin/utenti` },
       });

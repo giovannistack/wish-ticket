@@ -16,3 +16,4 @@ Ticketing di assistenza Wish S.r.l. Monorepo npm workspaces: `packages/shared` (
 - Ogni cliente vede solo la propria azienda: filtro `scoped(req)`, azienda presa dal token e mai dal body; ticket di altre aziende = 404.
 - Ruoli: `admin` (Wish), `referente`, `utente`; flag `superAdmin` per le azioni riservate (eliminare ticket, team, aziende e contratti, registro chiamate).
 - Contratti: chiamate scalate in modo atomico; ogni movimento finisce nel registro `movimentiContratto`.
+- Clienti (`aziende`): `tipo` azienda | privato. Tipologia mostrata = privato, oppure azienda con/senza contratto (`contratto.attivo`), calcolata da `tipologiaCliente()` in `packages/shared`. Un privato è un record cliente a sé (nome "Nome Cognome"), non compare mai in `/aziende/pubbliche`.

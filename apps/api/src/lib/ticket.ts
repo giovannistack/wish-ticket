@@ -10,9 +10,15 @@ import {
   type StatoTicket,
   type TicketAdminDTO,
 } from '@wish/shared';
-import { NotaModel, StoricoModel, TicketModel } from '../models/index.js';
+import { CAMPI_CLIENTE, NotaModel, StoricoModel, TicketModel } from '../models/index.js';
 import { ticketDTO } from './dto.js';
 import { elencoAllegati } from './allegati.js';
+
+/** "Azienda: MODO SPA" oppure "Cliente privato: Mario Rossi", per le email. */
+export const etichettaCliente = (a: unknown) => {
+  const c = a as { nome?: string; tipo?: string } | null;
+  return `${c?.tipo === 'privato' ? 'Cliente privato' : 'Azienda'}: ${c?.nome ?? ''}`;
+};
 
 /** Eventi dello storico che anche il cliente può vedere. */
 export const AZIONI_PUBBLICHE = ['creato', 'stato', 'assegnato', 'contratto', 'allegato'];
@@ -56,7 +62,7 @@ export function notaDTO(n: any): NotaDTO {
 }
 
 export const popolaTicket = <Q extends { populate: (p: string, s: string) => Q }>(q: Q) =>
-  q.populate('aziendaId', 'nome').populate('richiedenteId', 'nome cognome').populate('tecnicoId', 'nome cognome');
+  q.populate('aziendaId', CAMPI_CLIENTE).populate('richiedenteId', 'nome cognome').populate('tecnicoId', 'nome cognome');
 
 export async function storicoDi(ticketId: Types.ObjectId | string, soloPubblico = false) {
   const filtro: Record<string, unknown> = { ticketId };

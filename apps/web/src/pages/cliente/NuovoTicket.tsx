@@ -23,6 +23,7 @@ import { useAuth } from '../../auth';
 import { leggiForm, useErroriForm } from '../../form';
 import { SceltaFile } from '../../components/Allegati';
 import { AreaTesto, Avviso, Campo, Icona, Sezione, Selezione } from '../../components/ui';
+import { OpzioniClienti } from '../../components/Cliente';
 
 /**
  * Modulo di apertura ticket, lo stesso per il cliente e per il super admin.
@@ -120,7 +121,7 @@ export function ModuloTicket({ admin = false, testata }: { admin?: boolean; test
           <Sezione numero={1} titolo="Cliente">
             <div className="grid gap-3 sm:grid-cols-2">
               <Selezione
-                etichetta="Azienda"
+                etichetta="Cliente"
                 value={aziendaId}
                 onChange={(e) => {
                   setAziendaId(e.target.value);
@@ -128,9 +129,7 @@ export function ModuloTicket({ admin = false, testata }: { admin?: boolean; test
                 }}
               >
                 <option value="" disabled>Scegli…</option>
-                {aziende.data?.filter((a) => a.attiva).map((a) => (
-                  <option key={a.id} value={a.id}>{a.nome}</option>
-                ))}
+                <OpzioniClienti clienti={aziende.data?.filter((a) => a.attiva) ?? []} />
               </Selezione>
               <Selezione etichetta="Richiedente" value={richiedenteId} disabled={!aziendaId} onChange={(e) => setRichiedenteId(e.target.value)}>
                 <option value="">Nessuno: lo apre Wish</option>
