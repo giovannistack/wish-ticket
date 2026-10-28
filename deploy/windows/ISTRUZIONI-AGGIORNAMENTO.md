@@ -39,3 +39,5 @@ Il registro scrive una riga solo quando arriva una versione nuova o in caso di e
 - Una versione che non compila o non parte viene annullata: l'app torna alla versione precedente e resta online. La versione scartata è in `C:\wish-ticket\versione-scartata.txt` e non viene riprovata; la successiva pubblicata su GitHub sì.
 - `ATTENZIONE: anche il ripristino non e riuscito` nel registro = serve un controllo a mano (`C:\wish-ticket\logs\wish-ticket.log`).
 - Sospendere gli aggiornamenti: `schtasks /Change /TN "Wish Ticket aggiorna app" /Disable` (riattivare con `/Enable`).
+
+Ultima prova di aggiornamento automatico: 28/10/2026.
