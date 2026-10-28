@@ -6,7 +6,7 @@ import { TIPO_APPARATO_LABEL, TIPOLOGIA_INTERVENTO_LABEL, type RapportoDTO, type
 /** Intestazione del modulo "Rapporto intervento tecnico" di Wish IT. */
 export const WISH_IT = {
   ragioneSociale: 'Wish IT Srl',
-  indirizzo: 'Via Giovanni Botero 15',
+  indirizzo: 'Via Giovanni Botero 15, 00179 Roma',
   partitaIva: '04960111005',
   telefono: '06.7806570',
   fax: '06.78390189',
