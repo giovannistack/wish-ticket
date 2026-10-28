@@ -62,6 +62,16 @@ describe('gestione ticket', () => {
     expect(testi).toContain('Priorità: Media → Alta');
   });
 
+  it("accetta l'intervento presso il laboratorio e lo mostra anche al cliente", async () => {
+    const r = await patch({ modalita: 'laboratorio' });
+    expect(r.json().modalita).toBe('laboratorio');
+    const testi = (r.json().storico as Array<{ descrizione: string }>).map((e) => e.descrizione);
+    expect(testi).toContain('Intervento: presso il nostro laboratorio');
+    const c = await ctx.app.inject({ method: 'GET', url: `/api/ticket/${ticketId}`, headers: bearer(cliente.token) });
+    expect(c.json().modalita).toBe('laboratorio');
+    await patch({ modalita: 'onsite' });
+  });
+
   it('non permette di risolvere senza soluzione', async () => {
     const r = await patch({ stato: 'risolto' });
     expect(r.statusCode).toBe(400);

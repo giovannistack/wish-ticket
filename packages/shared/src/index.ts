@@ -67,9 +67,14 @@ export const STATO_TICKET_LABEL: Record<StatoTicket, string> = {
   chiuso: 'Chiuso',
 };
 
-export const MODALITA = ['remoto', 'onsite'] as const;
+/** Dove si interviene: collegamento remoto, dal cliente (on-site) o nel laboratorio Wish. */
+export const MODALITA = ['remoto', 'onsite', 'laboratorio'] as const;
 export type Modalita = (typeof MODALITA)[number];
-export const MODALITA_LABEL: Record<Modalita, string> = { remoto: 'Da remoto', onsite: 'On-site' };
+export const MODALITA_LABEL: Record<Modalita, string> = {
+  remoto: 'Da remoto',
+  onsite: 'On-site',
+  laboratorio: 'Presso il nostro laboratorio',
+};
 
 /** Stati che contano come "aperti" per i conteggi e i filtri. */
 export const STATI_APERTI: StatoTicket[] = ['nuovo', 'in_carico', 'in_attesa_cliente'];
