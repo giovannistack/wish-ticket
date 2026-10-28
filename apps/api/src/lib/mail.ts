@@ -10,6 +10,8 @@ export interface Email {
   titolo: string;
   paragrafi: string[];
   bottone?: { testo: string; url: string };
+  /** File allegati (es. il rapportino in PDF). */
+  allegati?: Array<{ nome: string; contenuto: Buffer; tipo: string }>;
 }
 
 export interface Mailer {
@@ -64,7 +66,15 @@ export function creaMailer(cfg: Config, log: FastifyBaseLogger): Mailer {
       }
       try {
         const cc = email.cc && email.cc.toLowerCase() !== email.a.toLowerCase() ? email.cc : undefined;
-        await transport.sendMail({ from: cfg.mittente, to: email.a, cc, subject: email.oggetto, html, text: testo });
+        await transport.sendMail({
+          from: cfg.mittente,
+          to: email.a,
+          cc,
+          subject: email.oggetto,
+          html,
+          text: testo,
+          attachments: email.allegati?.map((f) => ({ filename: f.nome, content: f.contenuto, contentType: f.tipo })),
+        });
       } catch (err) {
         // L'invio fallito non deve bloccare l'operazione: si registra e si va avanti.
         log.error({ err, a: email.a, oggetto: email.oggetto }, 'Invio email fallito');

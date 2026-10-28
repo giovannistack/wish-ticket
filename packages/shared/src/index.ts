@@ -287,6 +287,65 @@ export type AggiornaTicketInput = z.input<typeof aggiornaTicketSchema>;
 
 export const notaSchema = z.object({ testo: testo(1, 5000, 'Nota') });
 
+// ---------- Rapportino di intervento ----------
+
+/** Tipologia di ogni riga "Dettaglio interventi eseguiti" del rapportino. */
+export const TIPOLOGIE_INTERVENTO = ['hardware', 'software', 'installazione', 'aggiornamento', 'configurazione', 'altro'] as const;
+export type TipologiaIntervento = (typeof TIPOLOGIE_INTERVENTO)[number];
+export const TIPOLOGIA_INTERVENTO_LABEL: Record<TipologiaIntervento, string> = {
+  hardware: 'Hardware',
+  software: 'Software',
+  installazione: 'Installazione',
+  aggiornamento: 'Aggiornamento',
+  configurazione: 'Configurazione',
+  altro: 'Altro',
+};
+
+const ora = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Ora non valida (HH:MM)');
+const minutiDa = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/** Minuti di una riga: dalla ora di inizio a quella di fine, più il viaggio. */
+export const minutiRiga = (r: { inizio: string; fine: string; viaggioMinuti: number }) =>
+  Math.max(0, minutiDa(r.fine) - minutiDa(r.inizio)) + (r.viaggioMinuti || 0);
+
+const euro = z.number().min(0, 'Importo non valido').max(1_000_000, 'Importo troppo alto').transform((n) => Math.round(n * 100) / 100);
+
+export const rigaInterventoSchema = z
+  .object({
+    data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data non valida'),
+    inizio: ora,
+    fine: ora,
+    viaggioMinuti: z.number().int('Minuti interi').min(0).max(1440).default(0),
+    tipologia: z.enum(TIPOLOGIE_INTERVENTO),
+  })
+  .refine((r) => minutiDa(r.fine) > minutiDa(r.inizio), { message: "La fine deve essere dopo l'inizio", path: ['fine'] });
+
+export const parteSchema = z.object({
+  codice: z.string().trim().max(60).default(''),
+  descrizione: testo(1, 200, 'Descrizione'),
+  quantita: z.number().positive('Quantità non valida').max(10_000),
+  prezzoUnitario: euro.nullable().default(null),
+});
+
+export const rapportoSchema = z.object({
+  interventi: z.array(rigaInterventoSchema).max(30, 'Massimo 30 righe').default([]),
+  parti: z.array(parteSchema).max(50, 'Massimo 50 parti').default([]),
+  importoTotale: euro.nullable().default(null),
+  note: z.string().trim().max(2000).default(''),
+});
+export type RapportoInput = z.input<typeof rapportoSchema>;
+
+/** Firma con il dito: immagine PNG (data URL) e nome di chi firma. */
+export const firmaSchema = z.object({
+  chi: z.enum(['cliente', 'tecnico']),
+  nome: testo(2, 80, 'Nome'),
+  immagine: z
+    .string()
+    .max(400_000, 'Firma troppo grande')
+    .regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/, 'Firma non valida'),
+});
+export type FirmaInput = z.input<typeof firmaSchema>;
+
 export const nuovoTecnicoSchema = z.object({
   nome: testo(2, 60, 'Nome'),
   cognome: testo(2, 60, 'Cognome'),
@@ -423,6 +482,8 @@ export interface TicketDTO {
   chiusoIl: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Il cliente può scaricare il rapportino (ticket risolto o chiuso). */
+  rapportoDisponibile: boolean;
 }
 
 export interface EventoStoricoDTO {
@@ -454,8 +515,25 @@ export interface NotaDTO {
 }
 
 /** Dettaglio ticket per l'admin: in più tempo, note interne e storico completo. */
+export interface FirmaDTO {
+  nome: string;
+  immagine: string;
+  data: string;
+}
+
+export interface RapportoDTO {
+  interventi: Array<{ id: string; data: string; inizio: string; fine: string; viaggioMinuti: number; tipologia: TipologiaIntervento; minuti: number }>;
+  parti: Array<{ id: string; codice: string; descrizione: string; quantita: number; prezzoUnitario: number | null; totale: number | null }>;
+  importoTotale: number | null;
+  note: string;
+  minutiTotali: number;
+  totaleParti: number;
+  firme: { cliente: FirmaDTO | null; tecnico: FirmaDTO | null };
+}
+
 export interface TicketAdminDTO extends TicketDTO {
   tempoMinuti: number;
+  rapporto: RapportoDTO;
   allegati: AllegatoDTO[];
   note: NotaDTO[];
   storico: EventoStoricoDTO[];

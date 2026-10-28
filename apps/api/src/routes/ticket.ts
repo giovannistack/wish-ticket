@@ -5,6 +5,7 @@ import { nuovoTicketSchema, STATI_TICKET, STATI_APERTI } from '@wish/shared';
 import { AziendaModel, StoricoModel, TicketModel } from '../models/index.js';
 import { scoped } from '../plugins/auth.js';
 import { valida } from '../lib/valida.js';
+import { pdfDelTicket } from '../lib/pdfRapporto.js';
 import { nonTrovato } from '../lib/errori.js';
 import { ticketDTO } from '../lib/dto.js';
 import { popolaTicket, storicoDi } from '../lib/ticket.js';
@@ -67,6 +68,20 @@ const routes: FastifyPluginAsync = async (app) => {
     if (!t) throw nonTrovato('Ticket');
     return t;
   };
+
+  /** Rapportino di intervento in PDF: il cliente lo scarica quando il ticket è risolto o chiuso. */
+  app.get<{ Params: { id: string } }>('/:id/rapporto.pdf', async (req, reply) => {
+    if (!Types.ObjectId.isValid(req.params.id)) throw nonTrovato('Ticket');
+    const t = await TicketModel.findOne({ _id: req.params.id, ...scoped(req) }, { stato: 1 }).lean();
+    if (!t || (t.stato !== 'risolto' && t.stato !== 'chiuso')) throw nonTrovato('Rapportino');
+    const r = await pdfDelTicket(t._id);
+    if (!r) throw nonTrovato('Rapportino');
+    return reply
+      .header('content-type', 'application/pdf')
+      .header('content-disposition', `inline; filename="Rapportino-${r.numero}.pdf"`)
+      .header('cache-control', 'no-store')
+      .send(r.pdf);
+  });
 
   app.get<{ Params: { id: string } }>('/:id/allegati', async (req) => {
     const t = await ticketDelCliente(req.params.id, req);

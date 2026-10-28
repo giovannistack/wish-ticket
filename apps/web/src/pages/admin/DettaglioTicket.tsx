@@ -22,6 +22,7 @@ import { Storico } from '../../components/Storico';
 import { Allegati } from '../../components/Allegati';
 import { Avviso, Caricamento, Icona, dataBreve } from '../../components/ui';
 import { TipologiaPill } from '../../components/Cliente';
+import { Rapportino } from '../../components/Rapportino';
 import { BoxSoluzione, SchedaTicket } from '../cliente/DettaglioTicket';
 
 interface Bozza {
@@ -139,6 +140,14 @@ export default function DettaglioTicketAdmin() {
           <BoxSoluzione t={t} />
           <SchedaTicket t={t} />
           <Allegati allegati={t.allegati} percorsoUpload={`/admin/ticket/${t.id}/allegati`} admin onCambio={() => q.refetch()} />
+          <Rapportino
+            t={t}
+            onAggiornato={(nuovo) => {
+              aggiorna(nuovo);
+              // il tempo del ticket arriva dalle righe del rapportino: il pannello Gestione si allinea
+              setBozza((b) => b && { ...b, ore: Math.floor(nuovo.tempoMinuti / 60), minuti: nuovo.tempoMinuti % 60 });
+            }}
+          />
 
           <section className="card flex flex-col gap-3 p-5">
             <div className="flex items-baseline justify-between gap-2">
@@ -257,6 +266,12 @@ export default function DettaglioTicketAdmin() {
 
           <fieldset className="flex flex-col gap-1.5">
             <legend className="etichetta mb-1.5">Tempo impiegato</legend>
+            {t.rapporto.interventi.length > 0 ? (
+              <p className="rounded-xl bg-fondo px-3 py-2.5 text-sm">
+                <strong>{Math.floor(t.tempoMinuti / 60)} h {String(t.tempoMinuti % 60).padStart(2, '0')} min</strong>{' '}
+                <span className="text-muto">· somma degli interventi del rapportino</span>
+              </p>
+            ) : (
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-1.5 text-sm text-muto">
                 <input type="number" min={0} max={999} value={bozza.ore} onChange={(e) => set('ore', Math.max(0, Number(e.target.value) || 0))} className="campo h-11 w-16 px-2 text-center" aria-label="Ore" />
@@ -280,6 +295,7 @@ export default function DettaglioTicketAdmin() {
                 </button>
               ))}
             </div>
+            )}
           </fieldset>
 
           <label className="flex flex-col gap-1.5">

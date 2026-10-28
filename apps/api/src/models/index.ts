@@ -10,6 +10,7 @@ import {
   STATI_UTENTE,
   TIPI_APPARATO,
   TIPI_CLIENTE,
+  TIPOLOGIE_INTERVENTO,
   RICHIESTE_CLIENTE,
 } from '@wish/shared';
 
@@ -103,6 +104,28 @@ const contatoreSchema = new Schema({
 export const ContatoreModel = mongoose.model('Contatore', contatoreSchema, 'contatori');
 
 // ---------- Ticket ----------
+const rigaInterventoDb = new Schema({
+  data: { type: String, required: true }, // AAAA-MM-GG
+  inizio: { type: String, required: true }, // HH:MM
+  fine: { type: String, required: true },
+  viaggioMinuti: { type: Number, default: 0 },
+  tipologia: { type: String, enum: TIPOLOGIE_INTERVENTO, required: true },
+});
+const parteDb = new Schema({
+  codice: { type: String, default: '' },
+  descrizione: { type: String, required: true },
+  quantita: { type: Number, required: true },
+  prezzoUnitario: { type: Number, default: null },
+});
+const firmaDb = new Schema(
+  {
+    nome: { type: String, required: true },
+    immagine: { type: String, required: true }, // data URL PNG
+    data: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
 const ticketSchema = new Schema(
   {
     numero: { type: String, required: true },
@@ -125,6 +148,15 @@ const ticketSchema = new Schema(
     fuoriContratto: { type: Boolean, default: false },
     chiamataScalata: { type: Boolean, default: false },
     chiusoIl: { type: Date, default: null },
+    // Rapportino di intervento (modulo Wish IT)
+    rapporto: {
+      interventi: { type: [rigaInterventoDb], default: [] },
+      parti: { type: [parteDb], default: [] },
+      importoTotale: { type: Number, default: null },
+      note: { type: String, default: '' },
+      firmaCliente: { type: firmaDb, default: null },
+      firmaTecnico: { type: firmaDb, default: null },
+    },
   },
   { timestamps: true },
 );

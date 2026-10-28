@@ -84,6 +84,7 @@ export function ticketDTO(t: any): TicketDTO {
     fuoriContratto: !!t.fuoriContratto,
     chiamataScalata: !!t.chiamataScalata,
     chiusoIl: t.chiusoIl ? new Date(t.chiusoIl).toISOString() : null,
+    rapportoDisponibile: t.stato === 'risolto' || t.stato === 'chiuso',
     createdAt: new Date(t.createdAt).toISOString(),
     updatedAt: new Date(t.updatedAt).toISOString(),
   };

@@ -13,6 +13,7 @@ import {
 import { CAMPI_CLIENTE, NotaModel, StoricoModel, TicketModel } from '../models/index.js';
 import { ticketDTO } from './dto.js';
 import { elencoAllegati } from './allegati.js';
+import { rapportoDTO } from './rapporto.js';
 
 /** "Azienda: MODO SPA" oppure "Cliente privato: Mario Rossi", per le email. */
 export const etichettaCliente = (a: unknown) => {
@@ -21,7 +22,7 @@ export const etichettaCliente = (a: unknown) => {
 };
 
 /** Eventi dello storico che anche il cliente può vedere. */
-export const AZIONI_PUBBLICHE = ['creato', 'stato', 'assegnato', 'contratto', 'allegato'];
+export const AZIONI_PUBBLICHE = ['creato', 'stato', 'assegnato', 'contratto', 'allegato', 'firma'];
 
 const nomeDi = (u: unknown) => {
   const p = u as { nome?: string; cognome?: string } | null;
@@ -79,5 +80,5 @@ export async function ticketAdmin(id: Types.ObjectId | string): Promise<TicketAd
     storicoDi(id),
     elencoAllegati(id, false),
   ]);
-  return { ...ticketDTO(t), tempoMinuti: t.tempoMinuti ?? 0, allegati, note: note.map(notaDTO), storico };
+  return { ...ticketDTO(t), tempoMinuti: t.tempoMinuti ?? 0, rapporto: rapportoDTO(t.rapporto), allegati, note: note.map(notaDTO), storico };
 }

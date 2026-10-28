@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -12,6 +13,7 @@ import {
 import { api } from '../../api';
 import { Storico } from '../../components/Storico';
 import { Allegati } from '../../components/Allegati';
+import { scaricaRapportino } from '../../components/Rapportino';
 import { Avviso, Caricamento, Icona, PrioritaPill, StatoPill, dataBreve } from '../../components/ui';
 
 export function SchedaTicket({ t }: { t: TicketDTO }) {
@@ -65,6 +67,30 @@ export function BoxSoluzione({ t }: { t: TicketDTO }) {
   );
 }
 
+function ScaricaRapportino({ id, numero }: { id: string; numero: string }) {
+  const [stato, setStato] = useState<string | null>(null);
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        className="btn-secondario h-12 w-full"
+        onClick={async () => {
+          setStato('Preparazione del PDF…');
+          try {
+            await scaricaRapportino(`/ticket/${id}/rapporto.pdf`, numero);
+            setStato(null);
+          } catch {
+            setStato('Rapportino non disponibile, riprova tra poco.');
+          }
+        }}
+      >
+        <Icona nome="documento" dimensione={18} /> Scarica il rapportino di intervento (PDF)
+      </button>
+      {stato && <span className="text-center text-xs text-muto">{stato}</span>}
+    </div>
+  );
+}
+
 export default function DettaglioTicket() {
   const { id } = useParams();
   const statoNav = useLocation().state as { creato?: boolean; falliti?: string[] } | null;
@@ -101,6 +127,7 @@ export default function DettaglioTicket() {
             <Avviso tipo="info">Il tecnico ha bisogno di informazioni da te: rispondi all'email ricevuta o contatta Wish.</Avviso>
           )}
           <BoxSoluzione t={q.data} />
+          {q.data.rapportoDisponibile && <ScaricaRapportino id={q.data.id} numero={q.data.numero} />}
           {!!statoNav?.falliti?.length && <Avviso>Alcuni allegati non sono stati caricati: {statoNav.falliti.join(' · ')}</Avviso>}
           <SchedaTicket t={q.data} />
           <Allegati

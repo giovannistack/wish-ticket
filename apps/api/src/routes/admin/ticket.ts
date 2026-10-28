@@ -18,6 +18,7 @@ import { AziendaModel, NotaModel, StoricoModel, TicketModel, UtenteModel } from 
 import { valida } from '../../lib/valida.js';
 import { ErroreApi, nonTrovato, vietato } from '../../lib/errori.js';
 import { ticketDTO } from '../../lib/dto.js';
+import { pdfDelTicket } from '../../lib/pdfRapporto.js';
 import { etichettaCliente, popolaTicket, testoEvento, ticketAdmin } from '../../lib/ticket.js';
 import { restituisci, scala } from '../../lib/contratto.js';
 import { creaTicket } from '../../lib/creaTicket.js';
@@ -279,12 +280,16 @@ const routes: FastifyPluginAsync = async (app) => {
     };
     const paragrafi = testi[t.stato as StatoTicket];
     if (!paragrafi) return;
+    // Alla risoluzione il cliente riceve anche il rapportino di intervento
+    const rapporto = t.stato === 'risolto' ? await pdfDelTicket(t._id) : null;
+    if (rapporto) paragrafi.push('In allegato trovi il rapportino di intervento, scaricabile anche dalla scheda del ticket.');
     await app.mailer.invia({
       a: richiedente.email,
       oggetto: `${t.numero} · ${nomeAzienda(t)}: ${STATO_TICKET_LABEL[t.stato as StatoTicket].toLowerCase()} · Wish Assistenza`,
       titolo: `${t.numero} · ${t.oggetto}`,
       paragrafi: [etichettaCliente(t.aziendaId), ...paragrafi],
       bottone: { testo: 'Vedi il ticket', url: `${app.cfg.urlPubblico}/ticket/${t._id}` },
+      allegati: rapporto ? [{ nome: `Rapportino-${rapporto.numero}.pdf`, contenuto: rapporto.pdf, tipo: 'application/pdf' }] : undefined,
     });
   }
 };

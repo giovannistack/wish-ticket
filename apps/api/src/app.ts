@@ -19,6 +19,7 @@ import pubblicheRoutes from './routes/pubbliche.js';
 import adminUtentiRoutes from './routes/admin/utenti.js';
 import adminAziendeRoutes from './routes/admin/aziende.js';
 import adminTicketRoutes from './routes/admin/ticket.js';
+import adminRapportoRoutes from './routes/admin/rapporto.js';
 import adminTecniciRoutes from './routes/admin/tecnici.js';
 import allegatiRoutes from './routes/allegati.js';
 
@@ -95,6 +96,7 @@ export async function buildApp(opzioni: OpzioniApp = {}): Promise<FastifyInstanc
       await api.register(adminUtentiRoutes, { prefix: '/admin/utenti' });
       await api.register(adminAziendeRoutes, { prefix: '/admin/aziende' });
       await api.register(adminTicketRoutes, { prefix: '/admin/ticket' });
+      await api.register(adminRapportoRoutes, { prefix: '/admin/ticket' });
       await api.register(adminTecniciRoutes, { prefix: '/admin/tecnici' });
       await api.register(allegatiRoutes, { prefix: '/allegati' });
       api.setNotFoundHandler((_req, reply) => reply.status(404).send({ errore: 'Percorso non trovato', codice: 'NON_TROVATO' }));
