@@ -78,28 +78,23 @@ npm test                    # usa mongodb://127.0.0.1:27017 (o MONGO_URI_TEST)
 
 Ogni file di test crea un database usa e getta e lo cancella alla fine. I test più importanti sono in `apps/api/test/separazione.test.ts`: tre aziende, referente e dipendente per ognuna, e controlli incrociati (404 sui ticket altrui, azienda presa dal token e mai dal body, rotte admin chiuse ai clienti, trasferimento di un utente tra aziende).
 
-## Messa in produzione (Windows Server)
+## Produzione (Windows Server) e aggiornamenti automatici
 
-1. Installa **Node 24 LTS**, poi metti `nssm.exe` e `caddy.exe` in `C:\wish-ticket\bin`.
-2. Crea su MongoDB il database `wish_ticket` con un utente dedicato:
-   ```js
-   use wish_ticket
-   db.createUser({ user: "wish_ticket", pwd: "…", roles: [{ role: "readWrite", db: "wish_ticket" }] })
-   ```
-3. Copia il progetto in `C:\wish-ticket\app`, crea `.env` da `.env.example` e compila **tutte** le voci (JWT_SECRET, SMTP, URL_PUBBLICO…).
-4. Dentro `C:\wish-ticket\app`:
-   ```bat
-   npm ci
-   npm run build
-   npm run seed
-   ```
-5. Punta il DNS di `ticket.wishsrl.it` all'IP del server (o cambia il dominio nel `Caddyfile`).
-6. Come Amministratore: `deploy\windows\installa-servizi.bat`. Installa e avvia due servizi Windows (Node e Caddy) che ripartono da soli, e apre le porte 80 e 443.
-7. Pianifica il backup notturno (il comando è in testa a `deploy\windows\backup.bat`).
+L'app è online su **https://www.portalewish.com**, sul server 192.168.0.73.
 
-Per gli aggiornamenti: copia la nuova versione in `C:\wish-ticket\nuova` e lancia `deploy\windows\aggiorna.bat`. Lo script compila prima di fermare il servizio e tiene la versione precedente in `C:\wish-ticket\precedente`.
+- Progetto: `C:\Users\Administrator\Documents\Git\wish-ticket`, una copia del repository GitHub `giovannistack/wish-ticket` (branch `main`). Non si modifica a mano: viene riallineata a GitHub.
+- Fuori da GitHub, e mai toccati dagli aggiornamenti: `.env`, `data\allegati`, `node_modules`, `dist`.
+- Servizi Windows (NSSM, `C:\wish-ticket\bin`): **WishTicket** (Node 24 su 127.0.0.1:8040) e **WishTicketCaddy** (HTTPS su 80/443, config `C:\wish-ticket\Caddyfile`, che serve anche pcretrolab.it verso Apache su 8080).
+- Log: `C:\wish-ticket\logs` (`wish-ticket.log`, `caddy-servizio.log`, `aggiornamenti.log`).
 
-Su Linux: `docker compose -f deploy/docker/compose.yml --env-file .env up -d --build`, con Caddy o un altro proxy HTTPS davanti.
+**Aggiornamento automatico.** L'attività pianificata "Wish Ticket aggiorna app" lancia ogni 5 minuti `deploy\windows\aggiorna-app.ps1`. Se su `main` c'è una versione nuova: scarica, reinstalla i pacchetti se sono cambiati, compila, riavvia WishTicket e controlla `/api/salute`. Se qualcosa fallisce torna alla versione precedente, scrive l'errore in `aggiornamenti.log` e non riprova quella versione finché non ne arriva una nuova. Installazione: `deploy/windows/ISTRUZIONI-AGGIORNAMENTO.md`.
+
+Quindi, per pubblicare una modifica: test verdi, commit, push su `main`. Entro 5-10 minuti è online.
+
+Altro sul server:
+- `deploy\windows\installa-servizi.bat` (come Amministratore) crea o riallinea i due servizi.
+- `deploy\windows\backup.bat`: backup notturno del database e degli allegati (comando di pianificazione in testa al file).
+- In produzione `JWT_SECRET` è obbligatorio (almeno 32 caratteri).
 
 ## Note tecniche
 

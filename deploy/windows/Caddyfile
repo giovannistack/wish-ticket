@@ -1,6 +1,14 @@
 # Caddy: HTTPS automatico (Let's Encrypt) davanti a Node.
-# Il dominio deve puntare all'IP del server e le porte 80 e 443 devono essere aperte.
-ticket.wishsrl.it {
+# Sul server il file in uso e' C:\wish-ticket\Caddyfile (fuori dal progetto, cosi' gli
+# aggiornamenti non lo toccano): questo e' il modello. Dopo una modifica:
+#   C:\wish-ticket\bin\caddy.exe validate --config C:\wish-ticket\Caddyfile
+#   C:\wish-ticket\bin\nssm.exe restart WishTicketCaddy
+# I DNS di portalewish.com puntano all'IP pubblico; lo Zyxel inoltra 80 e 443 a 192.168.0.73.
+{
+	email assistenza@wishsrl.it
+}
+
+www.portalewish.com {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:8040
 	log {
@@ -9,4 +17,13 @@ ticket.wishsrl.it {
 			roll_keep 10
 		}
 	}
+}
+
+portalewish.com {
+	redir https://www.portalewish.com{uri} permanent
+}
+
+# pcretrolab: arriva da Cloudflare in http e va ad Apache (XAMPP) sulla porta 8080
+http://www.pcretrolab.it, http://pcretrolab.it {
+	reverse_proxy 127.0.0.1:8080
 }
