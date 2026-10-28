@@ -182,12 +182,12 @@ export default function DettaglioTicketAdmin() {
         <form onSubmit={onSalva} className="card flex min-w-0 flex-[1_1_320px] flex-col gap-4 p-5 lg:sticky lg:top-6">
           <h2 className="text-base font-extrabold">Gestione</h2>
 
-          {t.stato === 'nuovo' && (
+          {!t.tecnico && (t.stato === 'in_lavorazione' || t.stato === 'in_attesa_cliente') && (
             <button
               type="button"
               className="btn-primario h-12"
               disabled={salva.isPending}
-              onClick={() => salva.mutate({ stato: 'in_carico', ...(t.tecnico ? {} : { tecnicoId: utente?.id }) })}
+              onClick={() => salva.mutate({ tecnicoId: utente?.id })}
             >
               Prendi in carico
             </button>

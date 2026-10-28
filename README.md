@@ -15,8 +15,10 @@ Web app di ticketing per l'assistenza tecnica Wish. Tre aziende clienti (MODO SP
 
 **Fase 3 – gestione dei ticket (admin)**
 - Pannello Gestione nel dettaglio ticket: stato, priorità, tecnico, intervento (remoto/on-site), tempo impiegato, soluzione.
+- Stati: **In lavorazione** (ogni ticket nasce così), **In attesa cliente**, **Risolto**, **Chiuso**. I ticket senza tecnico sono "Da assegnare" in dashboard (riquadro, filtro, righe evidenziate, avviso dei bloccanti).
 - "Prendi in carico" assegna il ticket a chi lo prende. Per segnare risolto serve la soluzione, che il cliente riceve via email.
-- Email automatica al cliente a ogni cambio di stato (in carico, in attesa cliente, risolto, chiuso, riaperto).
+- Email automatica al cliente alla prima assegnazione ("se ne occupa…") e a ogni cambio di stato (in attesa cliente, di nuovo in lavorazione, risolto, chiuso, riaperto).
+- Intervento: da remoto, on-site (presso il cliente), presso il nostro laboratorio.
 - Note interne, mai visibili ai clienti. Storico completo di ogni modifica per l'admin; il cliente vede solo apertura, assegnazione e cambi di stato.
 - Dashboard: colonna tecnico e filtro "Assegnati a me".
 - Utenti e accessi: riquadro "Rifiutati e disattivati" con "Rimetti in attesa" ed "Elimina" (solo per chi non ha aperto ticket).

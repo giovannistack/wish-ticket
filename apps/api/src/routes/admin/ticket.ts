@@ -132,8 +132,10 @@ const routes: FastifyPluginAsync = async (app) => {
     let nuovoTecnico: { email: string; nome: string } | null = null;
     const statoPrima = t.stato as StatoTicket;
 
-    // Prendere in carico un ticket senza tecnico lo assegna a chi lo fa
-    if (dati.stato === 'in_carico' && !t.tecnicoId && dati.tecnicoId === undefined) dati.tecnicoId = req.utente.id;
+    // Riportare in lavorazione un ticket senza tecnico lo assegna a chi lo fa
+    if (dati.stato === 'in_lavorazione' && dati.stato !== statoPrima && !t.tecnicoId && dati.tecnicoId === undefined) dati.tecnicoId = req.utente.id;
+    // La prima assegnazione di un tecnico la comunichiamo al cliente ("se ne occupa…")
+    const primaAssegnazione = !t.tecnicoId && !!dati.tecnicoId;
 
     if (dati.tecnicoId !== undefined && String(dati.tecnicoId) !== String(t.tecnicoId ?? null)) {
       let nome: string | null = null;
@@ -197,7 +199,7 @@ const routes: FastifyPluginAsync = async (app) => {
       await StoricoModel.insertMany(
         eventi.map((e) => ({ ticketId: t._id, aziendaId: t.aziendaId, autoreId: req.utente.id, azione: e.azione, dettagli: { testo: e.testo } })),
       );
-      if (t.stato !== statoPrima) await avvisaCliente(t._id, statoPrima);
+      if (t.stato !== statoPrima || (primaAssegnazione && STATI_APERTI.includes(t.stato as StatoTicket))) await avvisaCliente(t._id, statoPrima);
       if (nuovoTecnico) await avvisaTecnico(t._id, nuovoTecnico, req.utente.id);
     }
     return ticketAdmin(t._id);
@@ -260,8 +262,12 @@ const routes: FastifyPluginAsync = async (app) => {
     const tecnico = t.tecnicoId as { nome?: string } | null;
     const riaperto = CHIUSI.includes(statoPrima) && STATI_APERTI.includes(t.stato as StatoTicket);
     const testi: Partial<Record<StatoTicket, string[]>> = {
-      in_carico: [
-        riaperto ? 'Il ticket è stato riaperto ed è di nuovo in lavorazione.' : `Il ticket è stato preso in carico${tecnico?.nome ? ` da ${tecnico.nome}` : ''}.`,
+      in_lavorazione: [
+        riaperto
+          ? 'Il ticket è stato riaperto ed è di nuovo in lavorazione.'
+          : statoPrima === 'in_attesa_cliente'
+            ? 'Grazie: il ticket è di nuovo in lavorazione.'
+            : `Il ticket è in lavorazione${tecnico?.nome ? `: se ne occupa ${tecnico.nome}` : ''}.`,
         'Ti avviseremo a ogni aggiornamento.',
       ],
       in_attesa_cliente: [

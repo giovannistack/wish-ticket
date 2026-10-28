@@ -82,8 +82,7 @@ export function Sezione({ numero, titolo, children }: { numero?: number; titolo:
 }
 
 const STILE_STATO: Record<StatoTicket, string> = {
-  nuovo: 'bg-brand-chiaro text-brand-scuro',
-  in_carico: 'bg-[#fff4de] text-[#7a4300]',
+  in_lavorazione: 'bg-[#fff4de] text-[#7a4300]',
   in_attesa_cliente: 'bg-[#f1ecff] text-[#4b2c99]',
   risolto: 'bg-[#e7f6ec] text-[#14632f]',
   chiuso: 'bg-[#f4f6fa] text-testo',

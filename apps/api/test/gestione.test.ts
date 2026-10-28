@@ -28,14 +28,21 @@ beforeAll(async () => {
 afterAll(async () => ctx?.chiudi());
 
 describe('gestione ticket', () => {
+  it('un ticket nuovo nasce in lavorazione, senza tecnico', async () => {
+    const r = await ctx.app.inject({ method: 'GET', url: `/api/admin/ticket/${ticketId}`, headers: bearer(admin) });
+    expect(r.json().stato).toBe('in_lavorazione');
+    expect(r.json().tecnico).toBeNull();
+  });
+
   it('prendere in carico assegna il ticket a chi lo fa e avvisa il cliente', async () => {
     const prima = ctx.app.mailer.posta.length;
-    const r = await patch({ stato: 'in_carico' });
+    const r = await patch({ tecnicoId: adminId });
     expect(r.statusCode).toBe(200);
-    expect(r.json().stato).toBe('in_carico');
+    expect(r.json().stato).toBe('in_lavorazione');
     expect(r.json().tecnico.id).toBe(adminId);
     const mail = ctx.app.mailer.posta.slice(prima).find((m) => m.a === 'cliente@modo.it');
-    expect(mail?.oggetto).toMatch(/in carico/);
+    expect(mail?.oggetto).toMatch(/in lavorazione/);
+    expect(mail?.paragrafi[1]).toBe('Il ticket è in lavorazione: se ne occupa Admin.');
     expect(mail?.oggetto).toContain(ctx.aziende.modo.nome);
     expect(mail?.paragrafi[0]).toBe(`Azienda: ${ctx.aziende.modo.nome}`);
   });
@@ -88,8 +95,11 @@ describe('gestione ticket', () => {
   });
 
   it('riaprire un ticket risolto azzera la chiusura', async () => {
-    const r = await patch({ stato: 'in_carico' });
+    const prima = ctx.app.mailer.posta.length;
+    const r = await patch({ stato: 'in_lavorazione' });
     expect(r.json().chiusoIl).toBeNull();
+    const mail = ctx.app.mailer.posta.slice(prima).find((m) => m.a === 'cliente@modo.it');
+    expect(mail?.paragrafi[1]).toBe('Il ticket è stato riaperto ed è di nuovo in lavorazione.');
   });
 
   it('accetta come tecnico solo un admin Wish attivo', async () => {
@@ -176,5 +186,17 @@ describe('rifiutati e disattivati', () => {
     expect(t.json().richiedente.nome).toBe('Utente eliminato');
     const me = await ctx.app.inject({ method: 'GET', url: '/api/me', headers: bearer(cliente.token) });
     expect(me.statusCode).toBe(401);
+  });
+});
+
+describe('migrazione degli stati', () => {
+  it('porta i vecchi stati "nuovo" e "in carico" a "in lavorazione", una volta sola', async () => {
+    const { TicketModel } = await import('../src/models/index.js');
+    const { unificaStatiAperti } = await import('../src/lib/migrazioni.js');
+    await TicketModel.collection.updateOne({ _id: new (await import('mongoose')).Types.ObjectId(ticketId) }, { $set: { stato: 'nuovo' } });
+    expect(await unificaStatiAperti()).toBe(1);
+    expect(await unificaStatiAperti()).toBe(0);
+    const t = await TicketModel.findById(ticketId).lean();
+    expect(t?.stato).toBe('in_lavorazione');
   });
 });

@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { STATI_TICKET, STATO_TICKET_LABEL, type AziendaConStatsDTO, type StatoTicket, type TicketDTO, type TipologiaCliente } from '@wish/shared';
+import { STATI_APERTI, STATI_TICKET, STATO_TICKET_LABEL, type AziendaConStatsDTO, type StatoTicket, type TicketDTO, type TipologiaCliente } from '@wish/shared';
 import { api } from '../../api';
 import { Avviso, Caricamento, Icona, PrioritaPill, StatoPill, Vuoto, dataBreve } from '../../components/ui';
 import { useAuth } from '../../auth';
 import { FiltroTipologia, OpzioniClienti, TipologiaPill } from '../../components/Cliente';
 
-const KPI: Array<{ stato: StatoTicket; etichetta: string; sotto: string; colore: string }> = [
-  { stato: 'nuovo', etichetta: 'Nuovi', sotto: 'da prendere in carico', colore: '#1747c9' },
-  { stato: 'in_carico', etichetta: 'In carico', sotto: 'in lavorazione', colore: '#c77700' },
+/** "Da assegnare" non è uno stato: sono i ticket aperti che non hanno ancora un tecnico. */
+type Vista = StatoTicket | 'da_assegnare';
+const daAssegnare = (t: TicketDTO) => !t.tecnico && STATI_APERTI.includes(t.stato);
+
+const KPI: Array<{ stato: Vista; etichetta: string; sotto: string; colore: string }> = [
+  { stato: 'da_assegnare', etichetta: 'Da assegnare', sotto: 'nessun tecnico ancora', colore: '#1747c9' },
+  { stato: 'in_lavorazione', etichetta: 'In lavorazione', sotto: 'in corso', colore: '#c77700' },
   { stato: 'in_attesa_cliente', etichetta: 'In attesa cliente', sotto: 'serve una risposta', colore: '#6b47d6' },
   { stato: 'risolto', etichetta: 'Risolti', sotto: 'in totale', colore: '#1f8a46' },
 ];
@@ -18,7 +22,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [aziendaId, setAziendaId] = useState('');
   const [tipologia, setTipologia] = useState<TipologiaCliente | ''>('');
-  const [stato, setStato] = useState<StatoTicket | ''>('');
+  const [stato, setStato] = useState<Vista | ''>('');
   const [cerca, setCerca] = useState('');
   const [soloMiei, setSoloMiei] = useState(false);
   const { utente } = useAuth();
@@ -41,15 +45,17 @@ export default function Dashboard() {
       (t) =>
         (!aziendaId || t.azienda.id === aziendaId) &&
         (!tipologia || t.azienda.tipologia === tipologia) &&
-        (!stato || t.stato === stato) &&
+        (!stato || (stato === 'da_assegnare' ? daAssegnare(t) : t.stato === stato)) &&
         (!soloMiei || t.tecnico?.id === utente?.id) &&
         (!q || [t.numero, t.oggetto, t.seriale, t.marcaModello, t.richiedente.nome, t.azienda.nome].some((v) => v.toLowerCase().includes(q))),
     );
   }, [tutti.data, aziendaId, tipologia, stato, cerca, soloMiei, utente?.id]);
 
-  const conteggio = (s: StatoTicket) =>
-    (tutti.data ?? []).filter((t) => t.stato === s && (!aziendaId || t.azienda.id === aziendaId) && (!tipologia || t.azienda.tipologia === tipologia)).length;
-  const bloccanti = (tutti.data ?? []).filter((t) => t.priorita === 'bloccante' && t.stato === 'nuovo');
+  const conteggio = (s: Vista) =>
+    (tutti.data ?? []).filter(
+      (t) => (s === 'da_assegnare' ? daAssegnare(t) : t.stato === s) && (!aziendaId || t.azienda.id === aziendaId) && (!tipologia || t.azienda.tipologia === tipologia),
+    ).length;
+  const bloccanti = (tutti.data ?? []).filter((t) => t.priorita === 'bloccante' && daAssegnare(t));
 
   return (
     <div className="flex flex-col gap-5">
@@ -143,8 +149,9 @@ export default function Dashboard() {
           </button>
           <label className="flex items-center gap-2 text-[13px] text-muto">
             <span className="sr-only">Filtra per stato</span>
-            <select value={stato} onChange={(e) => setStato(e.target.value as StatoTicket | '')} className="h-10 rounded-[10px] border border-bordo bg-white px-2.5 text-[13px] text-inchiostro">
+            <select value={stato} onChange={(e) => setStato(e.target.value as Vista | '')} className="h-10 rounded-[10px] border border-bordo bg-white px-2.5 text-[13px] text-inchiostro">
               <option value="">Tutti gli stati</option>
+              <option value="da_assegnare">Da assegnare</option>
               {STATI_TICKET.map((s) => (
                 <option key={s} value={s}>
                   {STATO_TICKET_LABEL[s]}
@@ -179,7 +186,7 @@ export default function Dashboard() {
                   <tr
                     key={t.id}
                     onClick={() => navigate(`/admin/ticket/${t.id}`)}
-                    className={`cursor-pointer border-t border-riga hover:bg-[#f7f9fc] ${t.stato === 'nuovo' ? 'bg-[#f2f6ff]' : ''}`}
+                    className={`cursor-pointer border-t border-riga hover:bg-[#f7f9fc] ${daAssegnare(t) ? 'bg-[#f2f6ff]' : ''}`}
                   >
                     <td className="px-5 py-3.5 align-top">
                       <Link to={`/admin/ticket/${t.id}`} className="font-mono text-[13px] text-brand" onClick={(e) => e.stopPropagation()}>
@@ -197,7 +204,7 @@ export default function Dashboard() {
                     </td>
                     <td className="px-3 py-3.5 align-top"><PrioritaPill priorita={t.priorita} /></td>
                     <td className="px-3 py-3.5 align-top"><StatoPill stato={t.stato} /></td>
-                    <td className="px-3 py-3.5 align-top text-testo">{t.tecnico?.nome ?? <span className="text-muto">—</span>}</td>
+                    <td className="px-3 py-3.5 align-top text-testo">{t.tecnico?.nome ?? <span className="text-muto">{daAssegnare(t) ? "Da assegnare" : "—"}</span>}</td>
                     <td className="whitespace-nowrap px-3 py-3.5 text-right align-top text-muto">{dataBreve(t.createdAt)}</td>
                     {utente?.superAdmin && <td className="px-3 py-2 text-right align-top">
                       <button

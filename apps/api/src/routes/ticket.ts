@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { nuovoTicketSchema, STATI_TICKET } from '@wish/shared';
+import { nuovoTicketSchema, STATI_TICKET, STATI_APERTI } from '@wish/shared';
 import { AziendaModel, StoricoModel, TicketModel } from '../models/index.js';
 import { scoped } from '../plugins/auth.js';
 import { valida } from '../lib/valida.js';
@@ -25,7 +25,7 @@ const routes: FastifyPluginAsync = async (app) => {
     const f = valida(filtriSchema, req.query);
     const filtro: Record<string, unknown> = { ...scoped(req) };
     if (f.stato) filtro.stato = f.stato;
-    else if (f.aperti) filtro.stato = { $in: ['nuovo', 'in_carico', 'in_attesa_cliente'] };
+    else if (f.aperti) filtro.stato = { $in: STATI_APERTI };
     const ticket = await popolaTicket(TicketModel.find(filtro).sort({ createdAt: -1 }).limit(300)).lean();
     return ticket.map(ticketDTO);
   });

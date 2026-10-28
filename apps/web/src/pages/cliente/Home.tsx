@@ -7,8 +7,7 @@ import { useAuth } from '../../auth';
 import { Avviso, Caricamento, Icona, StatoPill, Vuoto, dataBreve } from '../../components/ui';
 
 const avanzamento: Record<TicketDTO['stato'], number> = {
-  nuovo: 15,
-  in_carico: 50,
+  in_lavorazione: 40,
   in_attesa_cliente: 70,
   risolto: 100,
   chiuso: 100,

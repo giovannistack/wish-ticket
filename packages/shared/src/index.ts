@@ -57,11 +57,11 @@ export const PRIORITA_LABEL: Record<Priorita, { nome: string; descrizione: strin
   bloccante: { nome: 'Bloccante', descrizione: 'Ufficio fermo' },
 };
 
-export const STATI_TICKET = ['nuovo', 'in_carico', 'in_attesa_cliente', 'risolto', 'chiuso'] as const;
+/** Un ticket nasce "In lavorazione"; chi lo segue si vede dal tecnico assegnato. */
+export const STATI_TICKET = ['in_lavorazione', 'in_attesa_cliente', 'risolto', 'chiuso'] as const;
 export type StatoTicket = (typeof STATI_TICKET)[number];
 export const STATO_TICKET_LABEL: Record<StatoTicket, string> = {
-  nuovo: 'Nuovo',
-  in_carico: 'In carico',
+  in_lavorazione: 'In lavorazione',
   in_attesa_cliente: 'In attesa cliente',
   risolto: 'Risolto',
   chiuso: 'Chiuso',
@@ -77,7 +77,7 @@ export const MODALITA_LABEL: Record<Modalita, string> = {
 };
 
 /** Stati che contano come "aperti" per i conteggi e i filtri. */
-export const STATI_APERTI: StatoTicket[] = ['nuovo', 'in_carico', 'in_attesa_cliente'];
+export const STATI_APERTI: StatoTicket[] = ['in_lavorazione', 'in_attesa_cliente'];
 
 export const DISPONIBILITA = ['prima_possibile', 'mattina', 'pomeriggio'] as const;
 export type Disponibilita = (typeof DISPONIBILITA)[number];

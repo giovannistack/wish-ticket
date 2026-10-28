@@ -115,7 +115,7 @@ const ticketSchema = new Schema(
     seriale: { type: String, default: '' },
     descrizione: { type: String, required: true },
     priorita: { type: String, enum: PRIORITA, default: 'media' },
-    stato: { type: String, enum: STATI_TICKET, default: 'nuovo' },
+    stato: { type: String, enum: STATI_TICKET, default: 'in_lavorazione' },
     disponibilita: { type: String, enum: DISPONIBILITA, default: 'prima_possibile' },
     telefono: { type: String, default: '' },
     tecnicoId: { type: ObjectId, ref: 'Utente', default: null },

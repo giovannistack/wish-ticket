@@ -3,6 +3,7 @@ caricaEnv();
 import { buildApp } from './app.js';
 import { connettiDb, chiudiDb } from './db.js';
 import { RefreshTokenModel, UtenteModel } from './models/index.js';
+import { unificaStatiAperti } from './lib/migrazioni.js';
 
 const app = await buildApp();
 await connettiDb(app.cfg.mongoUri);
@@ -16,6 +17,8 @@ if (!(await UtenteModel.exists({ ruolo: 'admin', superAdmin: true }))) {
     app.log.info({ email: primo.email }, 'Super admin assegnato al primo admin');
   }
 }
+
+await unificaStatiAperti(app.log);
 
 // Pulizia dei refresh token scaduti, all'avvio e poi ogni 6 ore
 const pulisci = () =>
