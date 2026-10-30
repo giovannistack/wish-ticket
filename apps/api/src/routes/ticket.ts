@@ -1,12 +1,13 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { nuovoTicketSchema, STATI_TICKET, STATI_APERTI } from '@wish/shared';
+import { messaggioSchema, nuovoTicketSchema, STATI_TICKET, STATI_APERTI } from '@wish/shared';
 import { AziendaModel, StoricoModel, TicketModel } from '../models/index.js';
 import { scoped } from '../plugins/auth.js';
 import { valida } from '../lib/valida.js';
 import { pdfDelTicket } from '../lib/pdfRapporto.js';
-import { nonTrovato } from '../lib/errori.js';
+import { ErroreApi, nonTrovato } from '../lib/errori.js';
+import { elencoMessaggi, inviaMessaggio } from '../lib/messaggi.js';
 import { ticketDTO } from '../lib/dto.js';
 import { popolaTicket, storicoDi } from '../lib/ticket.js';
 import { contrattoDTO } from '../lib/contratto.js';
@@ -82,6 +83,27 @@ const routes: FastifyPluginAsync = async (app) => {
       .header('cache-control', 'no-store')
       .send(r.pdf);
   });
+
+  // ---------- Messaggi con Wish ----------
+
+  app.get<{ Params: { id: string } }>('/:id/messaggi', async (req) => {
+    const t = await ticketDelCliente(req.params.id, req);
+    return elencoMessaggi(t._id);
+  });
+
+  app.post<{ Params: { id: string } }>(
+    '/:id/messaggi',
+    { config: { rateLimit: { max: 60, timeWindow: '1 hour' } } },
+    async (req, reply) => {
+      if (!Types.ObjectId.isValid(req.params.id)) throw nonTrovato('Ticket');
+      const { testo } = valida(messaggioSchema, req.body);
+      const t = await TicketModel.findOne({ _id: req.params.id, ...scoped(req) }, { stato: 1 }).lean();
+      if (!t) throw nonTrovato('Ticket');
+      if (t.stato === 'chiuso') throw new ErroreApi(409, 'Il ticket è chiuso: per un nuovo problema apri un nuovo ticket', 'TICKET_CHIUSO');
+      await inviaMessaggio(app, t._id, req.utente.id, false, testo);
+      return reply.status(201).send(await elencoMessaggi(t._id));
+    },
+  );
 
   app.get<{ Params: { id: string } }>('/:id/allegati', async (req) => {
     const t = await ticketDelCliente(req.params.id, req);

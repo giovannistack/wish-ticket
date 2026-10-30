@@ -64,7 +64,7 @@ describe('team Wish', () => {
     expect(r.json().tecnico.nome).toBe('Luca Tecnico');
     const mail = ctx.app.mailer.posta.slice(prima).find((m) => m.a === 'luca@wishsrl.it');
     expect(mail?.oggetto).toMatch(/Ti è stato assegnato TK-/);
-    expect(mail?.cc).toBe(EMAIL_AVVISI);
+    expect(mail?.cc).toEqual([EMAIL_AVVISI]);
   });
 
   it('elenca il team con i ticket aperti assegnati', async () => {

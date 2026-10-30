@@ -4,8 +4,8 @@ import type { Config } from '../config.js';
 
 export interface Email {
   a: string;
-  /** Copia conoscenza (es. la casella assistenza). */
-  cc?: string;
+  /** Copia conoscenza (es. la casella assistenza e il tecnico). */
+  cc?: string | string[];
   oggetto: string;
   titolo: string;
   paragrafi: string[];
@@ -41,6 +41,15 @@ export function htmlEmail(e: Email): string {
 </table></td></tr></table></body></html>`;
 }
 
+/** Copie senza doppioni e senza il destinatario principale. */
+export function indirizziCc(email: Pick<Email, 'a' | 'cc'>): string[] | undefined {
+  const visti = new Set([email.a.toLowerCase()]);
+  const elenco = (Array.isArray(email.cc) ? email.cc : [email.cc ?? ''])
+    .map((x) => x.trim())
+    .filter((x) => x && !visti.has(x.toLowerCase()) && visti.add(x.toLowerCase()));
+  return elenco.length ? elenco : undefined;
+}
+
 export function creaMailer(cfg: Config, log: FastifyBaseLogger): Mailer {
   const posta: Mailer['posta'] = [];
   let transport: Transporter | null = null;
@@ -60,12 +69,12 @@ export function creaMailer(cfg: Config, log: FastifyBaseLogger): Mailer {
       const testo = [email.titolo, '', ...email.paragrafi, email.bottone ? `${email.bottone.testo}: ${email.bottone.url}` : '']
         .join('\n');
       if (!transport) {
-        posta.push({ ...email, html });
+        posta.push({ ...email, cc: indirizziCc(email), html });
         log.info({ a: email.a, cc: email.cc, oggetto: email.oggetto, link: email.bottone?.url }, 'Email (SMTP non configurato)');
         return;
       }
       try {
-        const cc = email.cc && email.cc.toLowerCase() !== email.a.toLowerCase() ? email.cc : undefined;
+        const cc = indirizziCc(email);
         await transport.sendMail({
           from: cfg.mittente,
           to: email.a,

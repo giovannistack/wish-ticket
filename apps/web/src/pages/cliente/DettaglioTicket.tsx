@@ -8,12 +8,14 @@ import {
   TIPO_APPARATO_LABEL,
   type AllegatoDTO,
   type EventoStoricoDTO,
+  type MessaggioDTO,
   type TicketDTO,
 } from '@wish/shared';
 import { api } from '../../api';
 import { Storico } from '../../components/Storico';
 import { Allegati } from '../../components/Allegati';
 import { scaricaRapportino } from '../../components/Rapportino';
+import { Messaggi } from '../../components/Messaggi';
 import { Avviso, Caricamento, Icona, PrioritaPill, StatoPill, dataBreve } from '../../components/ui';
 
 export function SchedaTicket({ t }: { t: TicketDTO }) {
@@ -102,6 +104,12 @@ export default function DettaglioTicket() {
     enabled: q.isSuccess,
     refetchInterval: 60_000,
   });
+  const messaggi = useQuery({
+    queryKey: ['ticket', id, 'messaggi'],
+    queryFn: () => api<MessaggioDTO[]>(`/ticket/${id}/messaggi`),
+    enabled: q.isSuccess,
+    refetchInterval: 30_000,
+  });
   const allegati = useQuery({
     queryKey: ['ticket', id, 'allegati'],
     queryFn: () => api<AllegatoDTO[]>(`/ticket/${id}/allegati`),
@@ -130,6 +138,17 @@ export default function DettaglioTicket() {
           {q.data.rapportoDisponibile && <ScaricaRapportino id={q.data.id} numero={q.data.numero} />}
           {!!statoNav?.falliti?.length && <Avviso>Alcuni allegati non sono stati caricati: {statoNav.falliti.join(' · ')}</Avviso>}
           <SchedaTicket t={q.data} />
+          <Messaggi
+            messaggi={messaggi.data ?? []}
+            lato="cliente"
+            sottotitolo="Il team Wish riceve il tuo messaggio via email"
+            chiuso={q.data.stato === 'chiuso' ? 'Il ticket è chiuso. Per un nuovo problema apri un nuovo ticket.' : undefined}
+            onInvia={async (testo) => {
+              const nuovi = await api<MessaggioDTO[]>(`/ticket/${id}/messaggi`, { method: 'POST', body: { testo } });
+              messaggi.refetch();
+              return nuovi;
+            }}
+          />
           <Allegati
             allegati={allegati.data ?? []}
             percorsoUpload={`/ticket/${id}/allegati`}

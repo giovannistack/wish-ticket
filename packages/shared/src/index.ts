@@ -286,6 +286,7 @@ export const aggiornaTicketSchema = z
 export type AggiornaTicketInput = z.input<typeof aggiornaTicketSchema>;
 
 export const notaSchema = z.object({ testo: testo(1, 5000, 'Nota') });
+export const messaggioSchema = z.object({ testo: testo(1, 5000, 'Messaggio') });
 
 // ---------- Rapportino di intervento ----------
 
@@ -507,6 +508,15 @@ export interface AllegatoDTO {
   data: string;
 }
 
+/** Un messaggio della conversazione tra Wish e il cliente (lo vedono entrambi). */
+export interface MessaggioDTO {
+  id: string;
+  testo: string;
+  autore: string;
+  daWish: boolean;
+  data: string;
+}
+
 export interface NotaDTO {
   id: string;
   testo: string;
@@ -534,6 +544,7 @@ export interface RapportoDTO {
 export interface TicketAdminDTO extends TicketDTO {
   tempoMinuti: number;
   rapporto: RapportoDTO;
+  messaggi: MessaggioDTO[];
   allegati: AllegatoDTO[];
   note: NotaDTO[];
   storico: EventoStoricoDTO[];

@@ -23,6 +23,7 @@ import { Allegati } from '../../components/Allegati';
 import { Avviso, Caricamento, Icona, dataBreve } from '../../components/ui';
 import { TipologiaPill } from '../../components/Cliente';
 import { Rapportino } from '../../components/Rapportino';
+import { Messaggi } from '../../components/Messaggi';
 import { BoxSoluzione, SchedaTicket } from '../cliente/DettaglioTicket';
 
 interface Bozza {
@@ -70,7 +71,8 @@ export default function DettaglioTicketAdmin() {
   const { utente } = useAuth();
   const qc = useQueryClient();
   const chiave = ['admin', 'ticket', id];
-  const q = useQuery({ queryKey: chiave, queryFn: () => api<TicketAdminDTO>(`/admin/ticket/${id}`) });
+  // si aggiorna da solo: le risposte del cliente compaiono senza ricaricare la pagina
+  const q = useQuery({ queryKey: chiave, queryFn: () => api<TicketAdminDTO>(`/admin/ticket/${id}`), refetchInterval: 60_000 });
   const aziende = useQuery({ queryKey: ['admin', 'aziende'], queryFn: () => api<AziendaConStatsDTO[]>('/admin/aziende') });
   const tecnici = useQuery({ queryKey: ['admin', 'tecnici'], queryFn: () => api<TecnicoDTO[]>('/admin/tecnici'), staleTime: 300_000 });
   const [bozza, setBozza] = useState<Bozza | null>(null);
@@ -139,6 +141,12 @@ export default function DettaglioTicketAdmin() {
         <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-4">
           <BoxSoluzione t={t} />
           <SchedaTicket t={t} />
+          <Messaggi
+            messaggi={t.messaggi}
+            lato="wish"
+            sottotitolo={`Email a ${t.richiedente.nome || 'cliente'} · in copia assistenza${t.tecnico ? ` e ${t.tecnico.nome}` : ''}`}
+            onInvia={async (testo) => aggiorna(await api<TicketAdminDTO>(`/admin/ticket/${t.id}/messaggi`, { method: 'POST', body: { testo } }))}
+          />
           <Allegati allegati={t.allegati} percorsoUpload={`/admin/ticket/${t.id}/allegati`} admin onCambio={() => q.refetch()} />
           <Rapportino
             t={t}

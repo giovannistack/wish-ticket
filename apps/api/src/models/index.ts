@@ -167,6 +167,20 @@ ticketSchema.index({ tecnicoId: 1, stato: 1 });
 export type Ticket = InferSchemaType<typeof ticketSchema>;
 export const TicketModel = mongoose.model('Ticket', ticketSchema, 'ticket');
 
+// ---------- Messaggi tra Wish e il cliente (visibili a entrambi) ----------
+const messaggioSchema = new Schema(
+  {
+    ticketId: { type: ObjectId, ref: 'Ticket', required: true },
+    aziendaId: { type: ObjectId, ref: 'Azienda', required: true },
+    autoreId: { type: ObjectId, ref: 'Utente', required: true },
+    daWish: { type: Boolean, required: true },
+    testo: { type: String, required: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+messaggioSchema.index({ ticketId: 1, createdAt: 1 });
+export const MessaggioModel = mongoose.model('Messaggio', messaggioSchema, 'messaggi');
+
 // ---------- Note interne (solo Wish, mai visibili ai clienti) ----------
 const notaSchema = new Schema(
   {

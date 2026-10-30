@@ -13,12 +13,14 @@ import {
   STATO_TICKET_LABEL,
   type Priorita,
   type StatoTicket,
+  messaggioSchema,
 } from '@wish/shared';
 import { AziendaModel, NotaModel, StoricoModel, TicketModel, UtenteModel } from '../../models/index.js';
 import { valida } from '../../lib/valida.js';
 import { ErroreApi, nonTrovato, vietato } from '../../lib/errori.js';
 import { ticketDTO } from '../../lib/dto.js';
 import { pdfDelTicket } from '../../lib/pdfRapporto.js';
+import { inviaMessaggio } from '../../lib/messaggi.js';
 import { etichettaCliente, popolaTicket, testoEvento, ticketAdmin } from '../../lib/ticket.js';
 import { restituisci, scala } from '../../lib/contratto.js';
 import { creaTicket } from '../../lib/creaTicket.js';
@@ -221,6 +223,16 @@ const routes: FastifyPluginAsync = async (app) => {
       dettagli: { numero: t.numero, oggetto: t.oggetto },
     });
     return { ok: true };
+  });
+
+  /** Messaggio al cliente: email al richiedente, in copia alla casella assistenza e al tecnico. */
+  app.post<{ Params: { id: string } }>('/:id/messaggi', async (req, reply) => {
+    if (!Types.ObjectId.isValid(req.params.id)) throw nonTrovato('Ticket');
+    const { testo } = valida(messaggioSchema, req.body);
+    const t = await TicketModel.findById(req.params.id, { _id: 1 }).lean();
+    if (!t) throw nonTrovato('Ticket');
+    await inviaMessaggio(app, t._id, req.utente.id, true, testo);
+    return reply.status(201).send(await ticketAdmin(t._id));
   });
 
   app.post<{ Params: { id: string } }>('/:id/note', async (req, reply) => {

@@ -50,6 +50,11 @@ Web app di ticketing per l'assistenza tecnica Wish. Tre aziende clienti (MODO SP
 - I ticket di clienti senza contratto e privati sono sempre fuori contratto e non vengono mai bloccati. Un privato non può avere un contratto a chiamate.
 - La pagina Aziende si chiama ora **Clienti**: cerca per nome o P.IVA e crea anche clienti privati.
 
+**Messaggi con il cliente**
+- Nel ticket, riquadro "Messaggi": una conversazione visibile a Wish e al cliente (e ai colleghi della sua azienda). Le note interne restano separate e mai visibili al cliente.
+- Quando scrive Wish: email al richiedente, in copia alla casella assistenza (`EMAIL_AVVISI_ADMIN`) e al tecnico assegnato. Quando risponde il cliente dal portale: email alla casella assistenza, in copia al tecnico.
+- A ticket chiuso il cliente non può più scrivere (per un nuovo problema apre un nuovo ticket). Le pagine del ticket si aggiornano da sole.
+
 **Rapportino di intervento (modulo Wish IT)**
 - Nel ticket, sezione "Rapportino di intervento": righe di intervento (data, inizio, fine, viaggio, tipologia), parti utilizzate con costo, importo totale intervento, note stampate sul rapportino. Il tempo del ticket è la somma delle righe.
 - Firma con il dito (tecnico e responsabile cliente) su telefono o tablet; in alternativa il PDF si stampa e si firma a penna. Se il contenuto cambia dopo la firma, le firme vengono annullate.

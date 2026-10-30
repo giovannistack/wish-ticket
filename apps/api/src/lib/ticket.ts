@@ -75,10 +75,12 @@ export async function storicoDi(ticketId: Types.ObjectId | string, soloPubblico 
 export async function ticketAdmin(id: Types.ObjectId | string): Promise<TicketAdminDTO | null> {
   const t = await popolaTicket(TicketModel.findById(id)).lean();
   if (!t) return null;
-  const [note, storico, allegati] = await Promise.all([
+  const { elencoMessaggi } = await import('./messaggi.js');
+  const [note, storico, allegati, messaggi] = await Promise.all([
     NotaModel.find({ ticketId: id }).sort({ createdAt: 1 }).populate('autoreId', 'nome cognome').lean(),
     storicoDi(id),
     elencoAllegati(id, false),
+    elencoMessaggi(id),
   ]);
-  return { ...ticketDTO(t), tempoMinuti: t.tempoMinuti ?? 0, rapporto: rapportoDTO(t.rapporto), allegati, note: note.map(notaDTO), storico };
+  return { ...ticketDTO(t), tempoMinuti: t.tempoMinuti ?? 0, rapporto: rapportoDTO(t.rapporto), messaggi, allegati, note: note.map(notaDTO), storico };
 }
