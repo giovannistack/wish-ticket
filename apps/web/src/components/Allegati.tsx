@@ -96,6 +96,10 @@ export function Allegati({
     mutationFn: (id: string) => api(`/allegati/${id}`, { method: 'DELETE' }),
     onSuccess: onCambio,
   });
+  const visibilita = useMutation({
+    mutationFn: (v: { id: string; visibileCliente: boolean }) => api(`/allegati/${v.id}`, { method: 'PATCH', body: { visibileCliente: v.visibileCliente } }),
+    onSuccess: onCambio,
+  });
 
   return (
     <section className="card flex flex-col gap-4 p-5">
@@ -119,8 +123,26 @@ export function Allegati({
               </span>
             </button>
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              {admin && !a.visibileCliente && <span className="pill bg-[#fff4de] text-[#7a4300]">Solo interno</span>}
-              {admin && a.visibileCliente && !a.daWish && <span className="pill bg-fondo text-testo">Dal cliente</span>}
+              {admin && (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={a.visibileCliente}
+                  aria-label={`${a.nome}: ${a.visibileCliente ? 'visibile al cliente' : 'non visibile al cliente'}`}
+                  title={a.visibileCliente ? 'Clicca per nasconderlo al cliente' : 'Clicca per renderlo visibile al cliente'}
+                  disabled={visibilita.isPending}
+                  onClick={() => visibilita.mutate({ id: a.id, visibileCliente: !a.visibileCliente })}
+                  className={`flex min-h-9 items-center gap-2 rounded-full border px-2.5 text-xs font-bold transition ${
+                    a.visibileCliente ? 'border-[#bfe3cb] bg-[#e7f6ec] text-[#14632f]' : 'border-[#f3d9a8] bg-[#fff4de] text-[#7a4300]'
+                  }`}
+                >
+                  <span className={`relative h-4 w-7 rounded-full transition ${a.visibileCliente ? 'bg-[#1f8a46]' : 'bg-[#d8b98a]'}`} aria-hidden="true">
+                    <span className={`absolute top-0.5 size-3 rounded-full bg-white shadow transition-all ${a.visibileCliente ? 'left-3.5' : 'left-0.5'}`} />
+                  </span>
+                  {a.visibileCliente ? 'Visibile al cliente' : 'Non visibile al cliente'}
+                </button>
+              )}
+              {admin && !a.daWish && <span className="text-[11px] text-muto">Caricato dal cliente</span>}
               {admin && (
                 <button
                   type="button"
@@ -175,9 +197,10 @@ export function Allegati({
             </label>
             {admin && (
               <label className="flex min-h-10 items-center gap-3 text-sm">
-                <input type="checkbox" checked={!visibile} onChange={(e) => setVisibile(!e.target.checked)} className="size-5 accent-[#c2410c]" />
+                <input type="checkbox" checked={visibile} onChange={(e) => setVisibile(e.target.checked)} className="size-5 accent-[#1f8a46]" />
                 <span>
-                  <strong>Solo interno</strong> <span className="text-muto">· il cliente non lo vede</span>
+                  <strong>Visibile al cliente</strong>{' '}
+                  <span className="text-muto">{visibile ? '· lo vede nel ticket e riceve una email' : '· resta solo per Wish'}</span>
                 </span>
               </label>
             )}
@@ -186,7 +209,7 @@ export function Allegati({
             </button>
           </>
         )}
-        {(errore || elimina.error) && <Avviso>{errore ?? (elimina.error as Error).message}</Avviso>}
+        {(errore || elimina.error || visibilita.error) && <Avviso>{errore ?? ((elimina.error ?? visibilita.error) as Error).message}</Avviso>}
       </form>
     </section>
   );

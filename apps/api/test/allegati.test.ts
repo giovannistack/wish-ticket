@@ -92,6 +92,29 @@ describe('allegati di Wish', () => {
     expect((await scarica(interno.id, tec)).statusCode).toBe(200);
   });
 
+  it("Wish rende visibile o nasconde un allegato con un clic; il cliente viene avvisato quando diventa visibile", async () => {
+    const tutti = await ctx.app.inject({ method: 'GET', url: `/api/admin/ticket/${ticketId}`, headers: bearer(tec) });
+    const interno = (tutti.json().allegati as Array<{ id: string; nome: string }>).find((x) => x.nome === 'interno.jpg')!;
+    const patch = (visibileCliente: boolean, token = tec) =>
+      ctx.app.inject({ method: 'PATCH', url: `/api/allegati/${interno.id}`, headers: bearer(token), payload: { visibileCliente } });
+
+    expect((await patch(true, cliente.token)).statusCode).toBe(403);
+
+    const prima = ctx.app.mailer.posta.length;
+    const v = await patch(true);
+    expect(v.statusCode).toBe(200);
+    expect(v.json().visibileCliente).toBe(true);
+    expect((await elenco()).some((x) => x.nome === 'interno.jpg')).toBe(true);
+    expect((await scarica(interno.id, cliente.token)).statusCode).toBe(200);
+    expect(ctx.app.mailer.posta.slice(prima).some((m) => m.a === 'c@modo.it' && /nuovo documento/.test(m.oggetto))).toBe(true);
+
+    const n = await patch(false);
+    expect(n.json().visibileCliente).toBe(false);
+    expect((await scarica(interno.id, cliente.token)).statusCode).toBe(404);
+    const s = await ctx.app.inject({ method: 'GET', url: `/api/ticket/${ticketId}/storico`, headers: bearer(cliente.token) });
+    expect(s.json().some((e: { descrizione: string }) => e.descrizione.includes('nascosto'))).toBe(false);
+  });
+
   it('il cliente non può eliminare allegati, Wish sì (anche il file sul disco)', async () => {
     const a = (await elenco())[0];
     expect((await ctx.app.inject({ method: 'DELETE', url: `/api/allegati/${a.id}`, headers: bearer(cliente.token) })).statusCode).toBe(403);

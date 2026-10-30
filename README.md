@@ -37,7 +37,7 @@ Web app di ticketing per l'assistenza tecnica Wish. Tre aziende clienti (MODO SP
 
 **Allegati, ticket da Wish, registro modificabile**
 - Foto (JPG, PNG, WEBP) e PDF fino a 10 MB su ogni ticket, anche al momento dell'apertura (fino a 5 file). Il tipo si controlla dal contenuto del file, non dal nome.
-- Il cliente vede i propri allegati e quelli di Wish visibili, con la nota; Wish vede tutto e può segnare un allegato "Solo interno". Quando Wish aggiunge un documento visibile, il cliente riceve una email.
+- Il cliente vede i propri allegati e quelli di Wish visibili, con la nota; Wish vede tutto. Accanto a ogni file Wish ha un interruttore "Visibile al cliente / Non visibile al cliente" che cambia con un clic. Quando un documento di Wish diventa visibile, il cliente riceve una email.
 - I file stanno in `data/allegati` (o in `CARTELLA_ALLEGATI`), mai accessibili senza accesso: si scaricano solo dall'app, con i permessi dell'utente. `aggiorna.bat` li conserva, `backup.bat` li copia.
 - Il super admin apre ticket per conto di un cliente (azienda, richiedente, stesso modulo) e può aprirli fuori contratto.
 - Il super admin modifica le righe del registro chiamate (motivo e numero), scegliendo se aggiornare anche il saldo.
