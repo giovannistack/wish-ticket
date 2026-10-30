@@ -45,6 +45,104 @@ function Miniatura({ a }: { a: AllegatoDTO }) {
   );
 }
 
+/** Scarica un allegato protetto con il suo nome originale. */
+async function scarica(a: AllegatoDTO) {
+  const url = URL.createObjectURL(await apiBlob(`/allegati/${a.id}/file`));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = a.nome;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/**
+ * Foto aperta in una finestra sopra la pagina: si chiude con la X, con Esc o cliccando fuori.
+ * Con più foto si scorre con le frecce (anche da tastiera).
+ */
+function Visualizzatore({ foto, indice, onIndice, onChiudi }: { foto: AllegatoDTO[]; indice: number; onIndice: (i: number) => void; onChiudi: () => void }) {
+  const a = foto[indice]!;
+  const [url, setUrl] = useState<string | null>(null);
+  const [errore, setErrore] = useState(false);
+  const chiudi = useRef<HTMLButtonElement>(null);
+  const piu = foto.length > 1;
+  const vai = (d: number) => onIndice((indice + d + foto.length) % foto.length);
+
+  useEffect(() => {
+    let revoca: string | null = null;
+    setUrl(null);
+    setErrore(false);
+    apiBlob(`/allegati/${a.id}/file`)
+      .then((b) => {
+        revoca = URL.createObjectURL(b);
+        setUrl(revoca);
+      })
+      .catch(() => setErrore(true));
+    return () => {
+      if (revoca) URL.revokeObjectURL(revoca);
+    };
+  }, [a.id]);
+
+  useEffect(() => {
+    chiudi.current?.focus();
+    const prima = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const tasti = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onChiudi();
+      if (piu && e.key === 'ArrowRight') vai(1);
+      if (piu && e.key === 'ArrowLeft') vai(-1);
+    };
+    window.addEventListener('keydown', tasti);
+    return () => {
+      document.body.style.overflow = prima;
+      window.removeEventListener('keydown', tasti);
+    };
+  });
+
+  const freccia = 'absolute top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-inchiostro shadow-lg hover:bg-white';
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#0b1730]/95 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label={a.nome} onClick={onChiudi}>
+      <div className="mx-auto flex w-full max-w-5xl items-center gap-3 pb-3 text-white" onClick={(e) => e.stopPropagation()}>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-bold">{a.nome}</span>
+          <span className="truncate text-xs text-[#c9d5f2]">
+            {a.nota ? `${a.nota} · ` : ''}
+            {a.daWish ? 'Wish' : a.autore} · {dataBreve(a.data)}
+            {piu ? ` · ${indice + 1} di ${foto.length}` : ''}
+          </span>
+        </div>
+        <button type="button" className="btn min-h-10 bg-white/15 text-white hover:bg-white/25" onClick={() => scarica(a)}>
+          <Icona nome="documento" dimensione={16} /> Scarica
+        </button>
+        <button ref={chiudi} type="button" aria-label="Chiudi" className="flex size-10 items-center justify-center rounded-xl bg-white/15 text-2xl leading-none text-white hover:bg-white/25" onClick={onChiudi}>
+          ×
+        </button>
+      </div>
+      <div className="relative mx-auto flex min-h-0 w-full max-w-5xl flex-1 items-center justify-center">
+        {url ? (
+          <img src={url} alt={a.nota || a.nome} className="max-h-full max-w-full rounded-xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+        ) : errore ? (
+          <p className="rounded-xl bg-white px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>Impossibile aprire la foto.</p>
+        ) : (
+          <span className="size-10 animate-spin rounded-full border-4 border-white/30 border-t-white" aria-label="Caricamento" />
+        )}
+        {piu && (
+          <>
+            <button type="button" aria-label="Foto precedente" className={`${freccia} left-1`} onClick={(e) => (e.stopPropagation(), vai(-1))}>
+              ‹
+            </button>
+            <button type="button" aria-label="Foto successiva" className={`${freccia} right-1`} onClick={(e) => (e.stopPropagation(), vai(1))}>
+              ›
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** I PDF si aprono in una nuova scheda, con il visore del browser. */
 async function apri(a: AllegatoDTO) {
   // la finestra si apre subito (i browser bloccano i popup aperti dopo un'attesa), poi riceve il file
   const finestra = window.open('', '_blank');
@@ -80,6 +178,8 @@ export function Allegati({
   const [nota, setNota] = useState('');
   const [visibile, setVisibile] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
+  const foto = allegati.filter((a) => a.mime.startsWith('image/'));
+  const [aperta, setAperta] = useState<number | null>(null);
 
   const carica = useMutation({
     mutationFn: () => apiUpload(percorsoUpload, file!, admin ? { nota, visibileCliente: String(visibile) } : { nota }),
@@ -109,10 +209,16 @@ export function Allegati({
       </div>
 
       {allegati.length === 0 && <p className="text-sm text-muto">Nessun allegato.</p>}
+      {aperta !== null && foto[aperta] && <Visualizzatore foto={foto} indice={aperta} onIndice={setAperta} onChiudi={() => setAperta(null)} />}
       <ul className="flex flex-col gap-2">
         {allegati.map((a) => (
           <li key={a.id} className={`flex items-center gap-3 rounded-xl border p-2.5 ${a.visibileCliente ? 'border-riga' : 'border-[#f3e2c2] bg-[#fffbea]'}`}>
-            <button type="button" onClick={() => apri(a)} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label={`Apri ${a.nome}`}>
+            <button
+              type="button"
+              onClick={() => (a.mime.startsWith('image/') ? setAperta(foto.findIndex((f) => f.id === a.id)) : apri(a))}
+              className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              aria-label={`Apri ${a.nome}`}
+            >
               <Miniatura a={a} />
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="truncate text-sm font-bold text-brand">{a.nome}</span>
